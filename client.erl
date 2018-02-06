@@ -30,7 +30,7 @@ loop(ServerName) ->
 
 
 
-handleMessage(self_stop, ServerName) ->
+handleMessage(self_stop, _ServerName) ->
     {ok, client_stopped};
 
 handleMessage({self_set, Key, Value}, ServerName) ->
