@@ -31,7 +31,7 @@ loop(ServerName) ->
 
 
 handleMessage(self_stop, ServerName) ->
-    {serverPid, ServerName} ! {self(), stop};
+    {ok, client_stopped};
 
 handleMessage({self_set, Key, Value}, ServerName) ->
     {serverPid, ServerName} ! {self(), set, Key, Value};
