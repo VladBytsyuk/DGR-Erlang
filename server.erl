@@ -1,12 +1,12 @@
 -module(server).
--export([start/1, stop/1, link/1]).
+-export([start/0, stop/0, link/1]).
 
 
-start(ServerName) -> 
-    register(ServerName, spawn(fun() -> loop({[], []}) end)).
+start() -> 
+    register(serverPid, spawn(fun() -> loop({[], []}) end)).
 
-stop(ServerName) -> 
-    ServerName ! stop.
+stop() -> 
+    serverPid ! stop.
 
 
 
@@ -23,17 +23,17 @@ loop(Data) ->
 
 
 
-handleMessage({ClientPid, stop}, _Data) -> {server_stopped, ClientPid};
+handleMessage(stop, _Data) -> server_stopped;
 
 handleMessage({ClientPid, set, Key, Value}, {ServersList, DataList}) ->
     NewDataList = lists:append([{Key, Value}], DataList),
-    io:format("Set: ~p, ~p~n", [Key, Value]),
+    io:format("~p Set: ~p, ~p~n", [ClientPid, Key, Value]),
     ClientPid ! {set, Key, Value}, 
     loop({ServersList, NewDataList});
 
 handleMessage({ClientPid, get, Key}, Data = {_ServersList, DataList}) ->
     Value = findValue(Key, DataList),
-    io:format("Get: ~p, ~p~n", [Key, Value]),
+    io:format("~p Get: ~p, ~p~n", [ClientPid, Key, Value]),
     ClientPid ! {get, Key, Value},
     loop(Data);
 

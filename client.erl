@@ -1,48 +1,49 @@
 -module(client).
 -compile(export_all).
 
-start(ClientName, ServerPid, ServerName) -> 
-    register(ClientName, spawn(fun() -> loop({ServerPid, ServerName}) end)),
-    net_kernel:connect_node(ServerName),
-    ClientName.
+start(ServerName) -> 
+    register(clientPid, spawn(fun() -> loop(ServerName) end)),
+    net_kernel:connect_node(ServerName).
 
-stop(ClientName) -> 
-    ClientName ! self_stop.
-
-
-set(ClientName, Key, Value) -> 
-    ClientName ! {self_set, Key, Value}.
-
-get(ClientName, Key) -> 
-    ClientName ! {self_get, Key}.
+stop() -> 
+    clientPid ! self_stop.
 
 
+set(Key, Value) -> 
+    clientPid ! {self_set, Key, Value},
+    {ok, send_request_to_server}.
 
-loop(Data) -> 
+get(Key) -> 
+    clientPid ! {self_get, Key},
+    {ok, wait_server_response}.
+
+
+
+loop(ServerName) -> 
     receive
-        self_stop -> 
-                handleMessage(self_stop, Data);
+        self_stop ->
+                handleMessage(self_stop, ServerName);
         Message -> 
-                handleMessage(Message, Data), 
-                loop(Data)
+                handleMessage(Message, ServerName), 
+                loop(ServerName)
     end.
 
 
 
-handleMessage(self_stop, {ServerPid, ServerName}) ->
-    {ServerPid, ServerName} ! {self(), stop};
+handleMessage(self_stop, ServerName) ->
+    {serverPid, ServerName} ! {self(), stop};
 
-handleMessage({self_set, Key, Value}, {ServerPid, ServerName}) ->
-    {ServerPid, ServerName} ! {self(), set, Key, Value};
+handleMessage({self_set, Key, Value}, ServerName) ->
+    {serverPid, ServerName} ! {self(), set, Key, Value};
 
-handleMessage({self_get, Key}, {ServerPid, ServerName}) ->
-    {ServerPid, ServerName} ! {self(), get, Key};
+handleMessage({self_get, Key}, ServerName) ->
+    {serverPid, ServerName} ! {self(), get, Key};
 
-handleMessage({set, Key, Value}, _Data) ->
+handleMessage({set, Key, Value}, _ServerName) ->
     io:format("Set: ~p, ~p~n", [Key, Value]),
     {ok, set, Key, Value};
 
-handleMessage({get, Key, Value}, _Data) ->
+handleMessage({get, Key, Value}, _ServerName) ->
     io:format("Get: ~p, ~p~n", [Key, Value]),
     {ok, get, Key, Value}.
         
