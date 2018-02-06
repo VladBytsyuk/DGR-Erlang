@@ -1,5 +1,5 @@
 -module(client).
--compile(export_all).
+-export([start/1, stop/0, set/2, get/1]).
 
 start(ServerName) -> 
     register(clientPid, spawn(fun() -> loop(ServerName) end)),
