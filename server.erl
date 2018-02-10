@@ -10,9 +10,10 @@ stop() ->
 
 
 
-link(ServerPid) ->
-    serverPid ! {link, ServerPid},
-    ServerPid ! {link, serverPid}.
+link(ServerName) ->
+    net_kernel:connect_node(ServerName),
+    {serverPid, ServerName} ! {link, node()},
+    serverPid ! {link, ServerName}.
 
 
 
@@ -37,8 +38,8 @@ handleMessage({ClientPid, get, Key}, Data = {_ServersList, DataList}) ->
     ClientPid ! {get, Key, Value},
     loop(Data);
 
-handleMessage({link, ServerPid}, {ServersList, DataList}) ->
-    NewServersList = lists:append([ServerPid], ServersList),
+handleMessage({link, ServerName}, {ServersList, DataList}) ->
+    NewServersList = lists:append([ServerName], ServersList),
     loop({NewServersList, DataList}).
 
 
