@@ -81,18 +81,13 @@ findValueOnOtherServers(Key, _ServersList = [H | T], UsedServersList) ->
     NewUsedServersList = oset:add_element(node(), UsedServersList),
     case oset:is_element(H, NewUsedServersList) of
         true -> 
-            io:format("Already used server - ~p~n", [H]),
             findValueOnOtherServers(Key, T, NewUsedServersList);
         false -> 
-            io:format("Trying to found on ~p server~n", [H]),
             {serverPid, H} ! {find, Key, node(), NewUsedServersList},
             receive
                 {value_not_found, UpdatedUsedServersList} -> 
-                    io:format("Value not found on ~p server~n", [H]),
-                    io:format("     Used servers: ~p~n", [UpdatedUsedServersList]),
                     findValueOnOtherServers(Key, T, UpdatedUsedServersList);
                 {found, _Key, Value} -> 
-                    io:format("Value (~p) found on ~p server~n", [Value, H]),
                     Value
             end
     end.
