@@ -19,7 +19,7 @@ link(ServerName) ->
 
 loop(Data) -> 
     receive
-        Message -> handleMessage(Message, Data)
+        Message -> handleClientMessage(Message, Data)
     end.
 
 %% ================================================================================================
@@ -28,16 +28,15 @@ loop(Data) ->
 %%
 %% ================================================================================================
 
-
-handleMessage(stop, _Data) -> 
+handleClientMessage(stop, _Data) -> 
     server_stopped;
 
-handleMessage({ClientPid, set, Key, Value}, {ServersList, DataList}) ->
+handleClientMessage({ClientPid, set, Key, Value}, {ServersList, DataList}) ->
     NewDataList = lists:append([{Key, Value}], DataList),
     ClientPid ! {set, Key, Value}, 
     loop({ServersList, NewDataList});
 
-handleMessage({ClientPid, get, Key}, Data = {ServersList, DataList}) ->
+handleClientMessage({ClientPid, get, Key}, Data = {ServersList, DataList}) ->
     Value = findValue(Key, DataList),
     if 
         Value == value_not_found -> 
@@ -49,7 +48,7 @@ handleMessage({ClientPid, get, Key}, Data = {ServersList, DataList}) ->
     end,
     loop(Data);
 
-handleMessage({find, Key, ServerName, UsedServersList}, Data = {ServersList, DataList}) ->
+handleClientMessage({find, Key, ServerName, UsedServersList}, Data = {ServersList, DataList}) ->
         Value = findValue(Key, DataList),
         if 
             Value == value_not_found ->
@@ -65,7 +64,7 @@ handleMessage({find, Key, ServerName, UsedServersList}, Data = {ServersList, Dat
         end,
         loop(Data);
 
-handleMessage({link, ServerName}, {ServersList, DataList}) ->
+handleClientMessage({link, ServerName}, {ServersList, DataList}) ->
     NewServersList = oset:add_element(ServerName, ServersList),
     loop({NewServersList, DataList}).
 
@@ -92,7 +91,9 @@ findValue(Key, [{K, V} | _T]) when Key == K ->
 findValue(Key, [{_K, _V} | T]) ->
     findValue(Key, T).
 
+
 % Find value on other servers
+
 findValueOnOtherServers(_Key, [], _UsedServersList) ->
     value_not_found;
 findValueOnOtherServers(Key, _ServersList = [H | T], UsedServersList) ->
