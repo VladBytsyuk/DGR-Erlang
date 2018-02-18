@@ -22,6 +22,11 @@ loop(Data) ->
         Message -> handleMessage(Message, Data)
     end.
 
+%% ================================================================================================
+%%
+%%  Handle client messages
+%%
+%% ================================================================================================
 
 
 handleMessage(stop, _Data) -> 
@@ -65,6 +70,18 @@ handleMessage({link, ServerName}, {ServersList, DataList}) ->
     loop({NewServersList, DataList}).
 
 
+%% ================================================================================================
+%%
+%%  Handle distributed messages
+%%
+%% ================================================================================================
+
+
+%% ================================================================================================
+%%
+%%  Utils functions
+%%
+%% ================================================================================================
 
 findValue(_Key, []) -> 
     value_not_found;
@@ -75,6 +92,7 @@ findValue(Key, [{K, V} | _T]) when Key == K ->
 findValue(Key, [{_K, _V} | T]) ->
     findValue(Key, T).
 
+% Find value on other servers
 findValueOnOtherServers(_Key, [], _UsedServersList) ->
     value_not_found;
 findValueOnOtherServers(Key, _ServersList = [H | T], UsedServersList) ->
