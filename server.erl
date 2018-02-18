@@ -79,7 +79,7 @@ handleClientMessage({find, Key, ServerName, UsedServersList}, Data = {ServersLis
 
 handleClientMessage({link, ServerName}, {ServersList, DataList, Config}) ->
     NewServersList = oset:add_element(ServerName, ServersList),
-    loop({NewServersList, DataList, Config}).
+    loop({NewServersList, DataList, Config});
 
 
 %% ================================================================================================
@@ -88,6 +88,11 @@ handleClientMessage({link, ServerName}, {ServersList, DataList, Config}) ->
 %%
 %% ================================================================================================
 
+handleClientMessage({object_max, ServerName, UsedServers}, Data = {ServersList, DataList, _Config}) ->
+    LocalMax = findMaxObjectNumberLocal(DataList),
+    Max = findNewObjectNumber(LocalMax, ServersList, UsedServers),
+    {serverPid, ServerName} ! {object_max, Max},
+    loop(Data).
 
 %% ================================================================================================
 %%
@@ -104,6 +109,14 @@ findValue(Key, [{K, V} | _T]) when Key == K ->
 findValue(Key, [{_K, _V} | T]) ->
     findValue(Key, T).
 
+findMaxObjectNumberLocal(_DataList = []) -> 0;
+findMaxObjectNumberLocal(_DataList = [H | T]) ->
+    {_Key, _Value, Number} = H,
+    RecursiveMax = findMaxObjectNumberLocal(T),
+    case Number > RecursiveMax of
+        true -> Number;
+        false -> RecursiveMax
+    end.
 
 % Find value on other servers
 
@@ -123,6 +136,25 @@ findValueOnOtherServers(Key, _ServersList = [H | T], UsedServersList) ->
                     Value
             end
     end.
+
+
+findNewObjectNumber(Max, _ServersList = [], _UsedServers) -> Max;
+findNewObjectNumber(Max, _ServersList = [H | T], UsedServers) ->
+    NewUsedServers = oset:add_element(node(), UsedServers),
+    case oset:is_element(H, NewUsedServers) of
+        true -> findNewObjectNumber(Max, T, NewUsedServers);
+        false -> 
+            {serverPid, H} ! {object_max, node(), NewUsedServers},
+            receive
+                {object_max, NewMax} -> 
+                    case Max < NewMax of
+                        true  -> findNewObjectNumber(NewMax, T, NewUsedServers);
+                        false -> findNewObjectNumber(Max, T, NewUsedServers)
+                    end
+            end
+    end.
+
+
 
 
 findMaxInsertionGain(Data, [], _UsedServersList) -> Data;
