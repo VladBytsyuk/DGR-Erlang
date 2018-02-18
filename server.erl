@@ -3,7 +3,20 @@
 
 
 start() -> 
-    register(serverPid, spawn(fun() -> loop({oset:new(), []}) end)).
+    register(serverPid, spawn(fun() -> 
+        loop({
+                _LinkedServers = oset:new(), 
+                _Data = [], 
+            
+                % Число серверов - не нужно -> оно вычисляется как LinkedServers.size()
+                % Число элементов - не нужно -> оно вычисляется как Data.size()
+                %
+                _Config = {
+                    % Вектор частоты использования каждого объекта на этом сервере
+                    _Ri = []
+                }
+        }) 
+    end)).
 
 stop() -> 
     serverPid ! stop.
@@ -31,12 +44,12 @@ loop(Data) ->
 handleClientMessage(stop, _Data) -> 
     server_stopped;
 
-handleClientMessage({ClientPid, set, Key, Value}, {ServersList, DataList}) ->
+handleClientMessage({ClientPid, set, Key, Value}, {ServersList, DataList, Config}) ->
     NewDataList = lists:append([{Key, Value}], DataList),
     ClientPid ! {set, Key, Value}, 
-    loop({ServersList, NewDataList});
+    loop({ServersList, NewDataList, Config});
 
-handleClientMessage({ClientPid, get, Key}, Data = {ServersList, DataList}) ->
+handleClientMessage({ClientPid, get, Key}, Data = {ServersList, DataList, _Config}) ->
     Value = findValue(Key, DataList),
     if 
         Value == value_not_found -> 
@@ -48,7 +61,7 @@ handleClientMessage({ClientPid, get, Key}, Data = {ServersList, DataList}) ->
     end,
     loop(Data);
 
-handleClientMessage({find, Key, ServerName, UsedServersList}, Data = {ServersList, DataList}) ->
+handleClientMessage({find, Key, ServerName, UsedServersList}, Data = {ServersList, DataList, _Config}) ->
         Value = findValue(Key, DataList),
         if 
             Value == value_not_found ->
@@ -64,9 +77,9 @@ handleClientMessage({find, Key, ServerName, UsedServersList}, Data = {ServersLis
         end,
         loop(Data);
 
-handleClientMessage({link, ServerName}, {ServersList, DataList}) ->
+handleClientMessage({link, ServerName}, {ServersList, DataList, Config}) ->
     NewServersList = oset:add_element(ServerName, ServersList),
-    loop({NewServersList, DataList}).
+    loop({NewServersList, DataList, Config}).
 
 
 %% ================================================================================================
