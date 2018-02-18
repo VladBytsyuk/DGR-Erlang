@@ -41,15 +41,18 @@ loop(Data) ->
 %%
 %% ================================================================================================
 
+% Сообщение об остановке сервера
 handleClientMessage(stop, _Data) -> 
     server_stopped;
 
+% Сообщение о сохранении пары ключ-значение на сервере
 handleClientMessage({ClientPid, set, Key, Value}, {ServersList, DataList, Config}) ->
     Number = findNewObjectNumber(0, ServersList, oset:new()),
     NewDataList = lists:append([{Key, Value, Number}], DataList),
     ClientPid ! {set, Key, Value}, 
     loop({ServersList, NewDataList, Config});
 
+% Сообщение о запросе значения по ключу от клиента
 handleClientMessage({ClientPid, get, Key}, Data = {ServersList, DataList, _Config}) ->
     Value = findValue(Key, DataList),
     if 
@@ -62,6 +65,19 @@ handleClientMessage({ClientPid, get, Key}, Data = {ServersList, DataList, _Confi
     end,
     loop(Data);
 
+% Сообщение о привязке текущего сервера к другому
+handleClientMessage({link, ServerName}, {ServersList, DataList, Config}) ->
+    NewServersList = oset:add_element(ServerName, ServersList),
+    loop({NewServersList, DataList, Config});
+
+
+%% ================================================================================================
+%%
+%%  Handle distributed messages
+%%
+%% ================================================================================================
+
+% Сообщение о поиске элемента другим сервером на этом и его соседях
 handleClientMessage({find, Key, ServerName, UsedServersList}, Data = {ServersList, DataList, _Config}) ->
         Value = findValue(Key, DataList),
         if 
@@ -78,17 +94,7 @@ handleClientMessage({find, Key, ServerName, UsedServersList}, Data = {ServersLis
         end,
         loop(Data);
 
-handleClientMessage({link, ServerName}, {ServersList, DataList, Config}) ->
-    NewServersList = oset:add_element(ServerName, ServersList),
-    loop({NewServersList, DataList, Config});
-
-
-%% ================================================================================================
-%%
-%%  Handle distributed messages
-%%
-%% ================================================================================================
-
+% Сообщение о поиске максимального номера объекта
 handleClientMessage({object_max, ServerName, UsedServers}, Data = {ServersList, DataList, _Config}) ->
     LocalMax = findMaxObjectNumberLocal(DataList),
     Max = findNewObjectNumber(LocalMax, ServersList, UsedServers),
@@ -101,6 +107,7 @@ handleClientMessage({object_max, ServerName, UsedServers}, Data = {ServersList, 
 %%
 %% ================================================================================================
 
+% Ищет значение по ключу на текущем сервере
 findValue(_Key, []) -> 
     value_not_found;
 
@@ -110,6 +117,7 @@ findValue(Key, [{K, V} | _T]) when Key == K ->
 findValue(Key, [{_K, _V} | T]) ->
     findValue(Key, T).
 
+% Находит максимальный номер объекта на текущем сервере
 findMaxObjectNumberLocal(_DataList = []) -> 0;
 findMaxObjectNumberLocal(_DataList = [H | T]) ->
     {_Key, _Value, Number} = H,
@@ -119,8 +127,7 @@ findMaxObjectNumberLocal(_DataList = [H | T]) ->
         false -> RecursiveMax
     end.
 
-% Find value on other servers
-
+% Находит значение по ключу на всех серверах рекурсивно
 findValueOnOtherServers(_Key, [], _UsedServersList) ->
     value_not_found;
 findValueOnOtherServers(Key, _ServersList = [H | T], UsedServersList) ->
@@ -138,7 +145,7 @@ findValueOnOtherServers(Key, _ServersList = [H | T], UsedServersList) ->
             end
     end.
 
-
+% Находит максимальный номер объекта среди всех объектов на соседних серверах рекурсивно 
 findNewObjectNumber(Max, _ServersList = [], _UsedServers) -> Max;
 findNewObjectNumber(Max, _ServersList = [H | T], UsedServers) ->
     NewUsedServers = oset:add_element(node(), UsedServers),
@@ -157,7 +164,7 @@ findNewObjectNumber(Max, _ServersList = [H | T], UsedServers) ->
 
 
 
-
+% Находим максимальную InsertionGain среди всех серверов и его номер
 findMaxInsertionGain(Data, [], _UsedServersList) -> Data;
 
 findMaxInsertionGain(Data = {InsertionGain, _I, _J, _EvictJ}, _ServersList = [H | T], UsedServersList) ->
