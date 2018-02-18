@@ -45,7 +45,8 @@ handleClientMessage(stop, _Data) ->
     server_stopped;
 
 handleClientMessage({ClientPid, set, Key, Value}, {ServersList, DataList, Config}) ->
-    NewDataList = lists:append([{Key, Value}], DataList),
+    Number = findNewObjectNumber(0, ServersList, oset:new()),
+    NewDataList = lists:append([{Key, Value, Number}], DataList),
     ClientPid ! {set, Key, Value}, 
     loop({ServersList, NewDataList, Config});
 
