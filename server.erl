@@ -110,3 +110,21 @@ findValueOnOtherServers(Key, _ServersList = [H | T], UsedServersList) ->
                     Value
             end
     end.
+
+
+findMaxInsertionGain(Data, [], _UsedServersList) -> Data;
+
+findMaxInsertionGain(Data = {InsertionGain, _I, _J, _EvictJ}, _ServersList = [H | T], UsedServersList) ->
+        NewUsedServersList = oset:add_element(node(), UsedServersList),
+        case oset:is_element(H, NewUsedServersList) of
+            true -> findMaxInsertionGain(Data, T, NewUsedServersList);
+            false -> 
+                {serverPid, H} ! {ig_max, node(), InsertionGain, NewUsedServersList},
+                receive
+                    {ig_max, NewData = {NewInsertionGain, _NewI, _NewJ, _NewEvictJ}} -> 
+                        case NewInsertionGain > InsertionGain of
+                            true ->  findMaxInsertionGain(NewData, T, NewUsedServersList);
+                            false -> findMaxInsertionGain(Data, T, NewUsedServersList)
+                        end
+                end
+        end.
