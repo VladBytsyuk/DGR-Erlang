@@ -29,10 +29,21 @@ slink(ServerName) ->
 
 % Main loop
 loop(State) -> 
+    printState(State),
     receive
         Message -> handleMessage(Message, State)
     end.
 
+printState(State) ->
+    {Servers, Data, {I, Ri}} = State,
+    io:format("~n", []),
+    io:format("State:~n", []),
+    io:format(" Servers: ~p~n", [oset:to_list(Servers)]),
+    io:format(" Data: ~p~n", [oset:to_list(Data)]),
+    io:format(" Config:~n", []),
+    io:format("     Server number: ~p~n", [I]),
+    io:format("     Ri: ~p~n", [Ri]),
+    io:format("~n", []).
 
 %% ================================================================================================
 %%
@@ -42,6 +53,7 @@ loop(State) ->
 
 % Current server was stopped
 handleMessage(stop, _State = {Servers, _Data, _Config}) -> 
+    io:format("Stop~n",[]),
     notifyStop(oset:to_list(Servers), oset:new(), node());
 
 % Remote server was stopped
@@ -52,13 +64,16 @@ handleMessage({s_stopped, StoppedName, UsedServers}, _State = {Servers, Data, Co
 
 % Set data from client
 handleMessage({c_set, Pid, Key, Value}, State = {Servers, _Data, _Config}) ->
+    io:format("Client -> Set {~p, ~p}~n", [Key, Value]),
     Object = findObject(Key, State),
+    io:format("Object in system - ~p~n", [Object]),
     {NewObject, NewData, NewConfig} = tryToAddObject(Object, State, Key, Value),
     Pid ! {c_set, NewObject}, 
     loop({Servers, NewData, NewConfig});
 
 % Get data to client
 handleMessage({c_get, Pid, Key}, State = {Servers, Data, Config}) ->
+    io:format("Client -> Get {~p}~n", [Key]),
     Object = findObject(Key, State),
     case Object of 
         value_not_found ->
