@@ -88,11 +88,29 @@ handleMessage({c_get, Pid, Key}, State = {Servers, Data, Config}) ->
             loop({Servers, Data, NewConfig})
     end;
 
+handleMessage({s_get, ServerName, Key, UsedServers}, State = {Servers, Data, _Config}) ->
+    LocalObject = findObjectLocal(Key, oset:to_list(Data)),
+    case LocalObject == value_not_found of
+        true  -> 
+            NewUsedServers = oset:add_element(node(), UsedServers),
+            RemoteObject = findObjectRemote(Key, oset:to_list(Servers), NewUsedServers),
+            {serverPid, ServerName} ! {s_get, RemoteObject};
+        false -> {serverPid, ServerName} ! {s_get, LocalObject}
+    end,
+    loop(State);
+
 % Update server config on adding object
 handleMessage({s_obj_add, UsedServers}, _State = {Servers, Data, _Config = { I, Ri }}) ->
-    NewConfig = { I, list:append(Ri, [0]) },
+    NewConfig = { I, lists:append(Ri, [0]) },
     notifyObjectAdded(oset:to_list(Servers), UsedServers),
-    loop({{Servers, Data, NewConfig}});
+    loop({Servers, Data, NewConfig});
+
+handleMessage({s_max_num, ServerName, Max, UsedServers}, State = {Servers, Data, _Config}) ->
+    LocalMax  = findMaxNumberLocal(Max, oset:to_list(Data)),
+    RemoteMax = findMaxNumberRemote(Max, oset:to_list(Servers), UsedServers),
+    RealMax = ?MAX(LocalMax, RemoteMax),
+    {serverPid, ServerName} ! {s_max_num, RealMax},
+    loop(State);
 
 % Link servers with each other
 handleMessage({link, ServerName}, _State = {ServersList, DataList, Config}) ->
@@ -119,7 +137,9 @@ notifyStop(_ServersList = [H | T], UsedServers, StoppedName) ->
 
 % Notify all servers that new object was added
 notifyObjectAdded(_State = {Servers, _Data, _Config}) ->
-    notifyObjectAdded(oset:to_list(Servers), oset:new()).
+    EmptyOset = oset:new(),
+    UsedServers = oset:add_element(node(), EmptyOset),
+    notifyObjectAdded(oset:to_list(Servers), UsedServers).
 notifyObjectAdded(_ServersList = [], _UsedServers) ->
     {ok, notifyObjectAdded};
 notifyObjectAdded(_ServersList = [H | T], UsedServers) ->
@@ -146,15 +166,16 @@ findObjectLocal(Key, [{_K, _V, _N} | T]) -> findObjectLocal(Key, T).
 findObjectRemote(Key, Servers) -> findObjectRemote(Key, oset:to_list(Servers), oset:new()).
 findObjectRemote(_Key, [], _UsedServers) -> value_not_found;
 findObjectRemote(Key, _ServersList = [H | T], UsedServers) ->
-    case oset:is_element(H, UsedServers) of
+    NewUsedServers = oset:add_element(node(), UsedServers),
+    case oset:is_element(H, NewUsedServers) of
         true  -> findObjectRemote(Key, T, UsedServers);
         false ->
-            NewUsedServers = oset:addElement(H, UsedServers),
-            {serverPid, H} ! {s_get, node(), Key, UsedServers},
+            UpdatedUsedServers = oset:add_element(H, NewUsedServers),
+            {serverPid, H} ! {s_get, node(), Key, UpdatedUsedServers},
             receive
                 {s_get, value_not_found} -> findObjectRemote(Key, T, NewUsedServers);
                 {s_get, Object} -> Object
-        end
+            end
     end.
 
 
@@ -170,13 +191,14 @@ findMaxNumberLocal(Max, _DataList = [_H | T]) -> findMaxNumberLocal(Max, T).
 
 findMaxNumberRemote(Max, _ServersList = [], _UsedServers) -> Max;
 findMaxNumberRemote(Max, _ServersList = [H | T], UsedServers) ->
-    case oset:is_element(H, UsedServers) of
-        true  -> findMaxNumberRemote(Max, T, UsedServers);
+    NewUsedServers = oset:add_element(node(), UsedServers),
+    case oset:is_element(H, NewUsedServers) of
+        true  -> findMaxNumberRemote(Max, T, NewUsedServers);
         false ->
-            NewUsedServers = oset:add_element(node()),
-            {serverPid, H} ! {s_max_num, node(), Max, NewUsedServers},
+            UpdatedUsedServers = oset:add_element(H, NewUsedServers),
+            {serverPid, H} ! {s_max_num, node(), Max, UpdatedUsedServers},
             receive
-                {s_max_num, NewMax, UpdatedUsedServers} -> 
+                {s_max_num, NewMax} -> 
                     findMaxNumberRemote(?MAX(Max, NewMax), T, UpdatedUsedServers)    
             end
     end.
