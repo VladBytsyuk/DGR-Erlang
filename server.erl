@@ -54,21 +54,21 @@ handleMessage({s_stopped, StoppedName, UsedServers}, _State = {Servers, Data, Co
 handleMessage({c_set, Pid, Key, Value}, State = {Servers, _Data, _Config}) ->
     Object = findObject(Key, State),
     {NewObject, NewData, NewConfig} = tryToAddObject(Object, State, Key, Value),
-    Pid ! {set, NewObject}, 
+    Pid ! {c_set, NewObject}, 
     loop({Servers, NewData, NewConfig});
 
 % Get data to client
 handleMessage({c_get, Pid, Key}, State = {Servers, Data, Config}) ->
-    Object = findObject(Key, Data),
+    Object = findObject(Key, State),
     case Object of 
         value_not_found ->
             Pid ! {c_get, value_not_found},
             loop(State);
         {_K, _V, N} ->
-            { _I, Ri } = Config,    
-            OldRiN = lists:get(N),
+            { I, Ri } = Config,    
+            OldRiN = getListItem(N, Ri),
             NewRi = replaceListItem(N, OldRiN + 1, Ri),
-            NewConfig = { NewRi },
+            NewConfig = { I, NewRi },
             Pid ! {c_get, Object},
             loop({Servers, Data, NewConfig})
     end;
@@ -168,16 +168,13 @@ findMaxNumberRemote(Max, _ServersList = [H | T], UsedServers) ->
 
 
 % Replaced list item by Index, on Value in List
-replaceListItem(Index, Value, List) -> replaceListItem(Index - 1, Value, List, [], 0).
-replaceListItem(ReplaceIndex, Value, [_V | List], Acc, ReplaceIndex) -> 
-    lists:replaceListItem(Acc) ++ [Value | List];
-replaceListItem(ReplaceIndex, Value, [V | List], Acc, Index) -> 
-    replaceListItem(ReplaceIndex, Value, List, [V | Acc], Index + 1).
+replaceListItem(0, Value, _List = [_H | T]) -> [Value] ++ T;
+replaceListItem(Index, Value, _List = [H | T]) -> [H] ++ replaceListItem(Index - 1, Value, T).
 
 
 % Forms new (Updates old) object and put it into Data
 tryToAddObject(value_not_found, State = {Servers, Data, _Config = { I, Ri }}, Key, Value) ->
-    Number = findMaxNumber(0, oset:to_list(Servers), oset:new(), Data),
+    Number = findMaxNumber(-1, oset:to_list(Servers), oset:new(), Data) + 1,
     Object = {Key, Value, Number},
     NewData = oset:add_element(Object, Data),
     notifyObjectAdded(State),
@@ -188,3 +185,8 @@ tryToAddObject(Object, _State = {_Servers, Data, Config}, _Key, Value) ->
     {K, _V, N} = Object,
     NewObject = {K, Value, N},
     {NewObject, NewData, Config}.
+
+% Get list item by index
+getListItem(_Index, _List = []) -> {error, index_greater_than_list_size};
+getListItem(0, _List = [H | _T]) -> H;
+getListItem(Index, _List = [_H | T]) -> getListItem(Index - 1, T).

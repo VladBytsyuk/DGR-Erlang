@@ -39,11 +39,11 @@ handleMessage({self_set, Key, Value}, ServerName) ->
 handleMessage({self_get, Key}, ServerName) ->
     {serverPid, ServerName} ! {c_get, self(), Key};
 
-handleMessage({set, Object}, _ServerName) ->
+handleMessage({c_set, Object}, _ServerName) ->
     io:format("Set: ~p~n", [Object]),
     {ok, set, Object};
 
-handleMessage({get, Key, Value}, _ServerName) ->
-    io:format("Get: ~p, ~p~n", [Key, Value]),
-    {ok, get, Key, Value}.
+handleMessage({c_get, Object}, _ServerName) ->
+    io:format("Get: ~p~n", [Object]),
+    {ok, get, Object}.
         
