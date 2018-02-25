@@ -125,8 +125,8 @@ findObject(Key, {Servers, Data, _Config}) ->
     end.
 
 findObjectLocal(_Key, []) -> value_not_found;
-findObjectLocal(Key, [{K, V, N} | _T]) when Key == K -> {K, V, N};
-findObjectLocal(Key, [{_K, _V, _N} | T]) -> findObject(Key, T).
+findObjectLocal(Key, [{Key, V, N} | _T]) -> {Key, V, N};
+findObjectLocal(Key, [{_K, _V, _N} | T]) -> findObjectLocal(Key, T).
 
 findObjectRemote(Key, Servers) -> findObjectRemote(Key, oset:to_list(Servers), oset:new()).
 findObjectRemote(_Key, [], _UsedServers) -> value_not_found;
@@ -181,7 +181,7 @@ tryToAddObject(value_not_found, State = {Servers, Data, _Config = { I, Ri }}, Ke
     Object = {Key, Value, Number},
     NewData = oset:add_element(Object, Data),
     notifyObjectAdded(State),
-    NewConfig = { I, list:append(Ri, [0]) },
+    NewConfig = { I, lists:append(Ri, [0]) },
     {Object, NewData, NewConfig};
 tryToAddObject(Object, _State = {_Servers, Data, Config}, _Key, Value) ->
     NewData = oset:add_element(Object, Data),
