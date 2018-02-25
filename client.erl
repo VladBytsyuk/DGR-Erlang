@@ -22,10 +22,10 @@ get(Key) ->
 loop(ServerName) -> 
     receive
         self_stop ->
-                handleMessage(self_stop, ServerName);
+            handleMessage(self_stop, ServerName);
         Message -> 
-                handleMessage(Message, ServerName), 
-                loop(ServerName)
+            handleMessage(Message, ServerName), 
+            loop(ServerName)
     end.
 
 
@@ -34,14 +34,14 @@ handleMessage(self_stop, _ServerName) ->
     {ok, client_stopped};
 
 handleMessage({self_set, Key, Value}, ServerName) ->
-    {serverPid, ServerName} ! {self(), set, Key, Value};
+    {serverPid, ServerName} ! {c_set, self(), Key, Value};
 
 handleMessage({self_get, Key}, ServerName) ->
-    {serverPid, ServerName} ! {self(), get, Key};
+    {serverPid, ServerName} ! {c_get, self(), Key};
 
-handleMessage({set, Key, Value}, _ServerName) ->
-    io:format("Set: ~p, ~p~n", [Key, Value]),
-    {ok, set, Key, Value};
+handleMessage({set, Object}, _ServerName) ->
+    io:format("Set: ~p~n", [Object]),
+    {ok, set, Object};
 
 handleMessage({get, Key, Value}, _ServerName) ->
     io:format("Get: ~p, ~p~n", [Key, Value]),
