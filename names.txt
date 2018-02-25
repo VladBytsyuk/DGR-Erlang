@@ -1,0 +1,7 @@
+0 alice@vbytsyuk-xps15 []
+1 bob@vbytsyuk-xps15 [0]
+2 carol@vbytsyuk-xps15 [0]
+3 derek@vbytsyuk-xps15 [2]
+4 erik@vbytsyuk-xps15 [1,3]
+5 fred@vbytsyuk-xps15 [2,4]      
+6 george@vbytsyuk-xps15 [3]    

@@ -1,7 +1,7 @@
 -module(client).
--export([start/1, stop/0, set/2, get/1]).
+-export([cstart/1, stop/0, set/2, get/1]).
 
-start(ServerName) -> 
+cstart(ServerName) ->
     register(clientPid, spawn(fun() -> loop(ServerName) end)),
     net_kernel:connect_node(ServerName).
 

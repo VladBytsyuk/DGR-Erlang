@@ -1,16 +1,17 @@
 -module(server).
--export([start/0, stop/0, link/1]).
+-export([start/1, stop/0, slink/1]).
 
 % Macro
 -define(IF(Condition, True, False), (case (Condition) of true -> (True); false -> (False) end)).
 -define(MAX(A, B), (case (A > B) of true -> A; false -> B end)).
 
 % Exported functions
-start() -> 
+start(Number) -> 
     register(serverPid, spawn(fun() -> 
         loop({_LinkedServers = oset:new(), 
                 _Data = oset:new(), 
                 _Config = {
+                    Number,
                     % Вектор частоты использования каждого объекта на этом сервере
                     _Ri = []
                 }
@@ -20,7 +21,7 @@ start() ->
 stop() -> 
     serverPid ! stop.
 
-link(ServerName) ->
+slink(ServerName) ->
     net_kernel:connect_node(ServerName),
     {serverPid, ServerName} ! {link, node()},
     serverPid ! {link, ServerName}.
@@ -64,7 +65,7 @@ handleMessage({c_get, Pid, Key}, State = {Servers, Data, Config}) ->
             Pid ! {c_get, value_not_found},
             loop(State);
         {_K, _V, N} ->
-            { Ri } = Config,    
+            { _I, Ri } = Config,    
             OldRiN = lists:get(N),
             NewRi = replaceListItem(N, OldRiN + 1, Ri),
             NewConfig = { NewRi },
@@ -73,8 +74,8 @@ handleMessage({c_get, Pid, Key}, State = {Servers, Data, Config}) ->
     end;
 
 % Update server config on adding object
-handleMessage({s_obj_add, UsedServers}, _State = {Servers, Data, _Config = { Ri }}) ->
-    NewConfig = { list:append(Ri, [0]) },
+handleMessage({s_obj_add, UsedServers}, _State = {Servers, Data, _Config = { I, Ri }}) ->
+    NewConfig = { I, list:append(Ri, [0]) },
     notifyObjectAdded(oset:to_list(Servers), UsedServers),
     loop({{Servers, Data, NewConfig}});
 
@@ -175,12 +176,12 @@ replaceListItem(ReplaceIndex, Value, [V | List], Acc, Index) ->
 
 
 % Forms new (Updates old) object and put it into Data
-tryToAddObject(value_not_found, State = {Servers, Data, _Config = { Ri }}, Key, Value) ->
+tryToAddObject(value_not_found, State = {Servers, Data, _Config = { I, Ri }}, Key, Value) ->
     Number = findMaxNumber(0, oset:to_list(Servers), oset:new(), Data),
     Object = {Key, Value, Number},
     NewData = oset:add_element(Object, Data),
     notifyObjectAdded(State),
-    NewConfig = { list:append(Ri, [0]) },
+    NewConfig = { I, list:append(Ri, [0]) },
     {Object, NewData, NewConfig};
 tryToAddObject(Object, _State = {_Servers, Data, Config}, _Key, Value) ->
     NewData = oset:add_element(Object, Data),
