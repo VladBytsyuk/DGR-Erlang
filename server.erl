@@ -79,7 +79,7 @@ handleMessage({c_set, Pid, Key, Value}, State = {Servers, _Data, _Config}) ->
     io:format("Object in system - ~p~n", [Object]),
     {NewObject, NewData, NewConfig} = s_utils:tryToAddObject(Object, State, Key, Value),
     Pid ! {c_set, NewObject}, 
-    NewState = dgr:dgr({Servers, NewData, NewConfig}),
+    NewState = {Servers, NewData, NewConfig},%dgr:dgr({Servers, NewData, NewConfig}),
     loop(NewState);
 
 % Get data to client
@@ -91,12 +91,12 @@ handleMessage({c_get, Pid, Key}, State = {Servers, Data, Config}) ->
             Pid ! {c_get, value_not_found},
             loop(State);
         {_K, _V, N} ->
-            { I, C, E, Ri } = Config,    
+            { I, C, E, Ri, Xi } = Config,    
             OldRiN = s_utils:getListItem(N, Ri),
             NewRi = s_utils:replaceListItem(N, OldRiN + 1, Ri),
-            NewConfig = { I, C, E, NewRi },
+            NewConfig = { I, C, E, NewRi, Xi },
             Pid ! {c_get, Object},
-            NewState = dgr:dgr({Servers, Data, NewConfig}),
+            NewState = {Servers, Data, NewConfig},%dgr:dgr({Servers, Data, NewConfig}),
             loop(NewState)
     end;
 
