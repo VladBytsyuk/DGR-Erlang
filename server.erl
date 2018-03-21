@@ -79,8 +79,8 @@ handleMessage({c_set, Pid, Key, Value}, State = {Servers, _Data, _Config}) ->
     io:format("Object in system - ~p~n", [Object]),
     {NewObject, NewData, NewConfig} = s_utils:tryToAddObject(Object, State, Key, Value),
     Pid ! {c_set, NewObject}, 
-    NewState = {Servers, NewData, NewConfig},%dgr:dgr({Servers, NewData, NewConfig}),
-    loop(NewState);
+    %NewState = dgr:dgr({Servers, NewData, NewConfig}),
+    loop({Servers, NewData, NewConfig});
 
 % Get data to client
 handleMessage({c_get, Pid, Key}, State = {Servers, Data, Config}) ->
@@ -96,7 +96,7 @@ handleMessage({c_get, Pid, Key}, State = {Servers, Data, Config}) ->
             NewRi = s_utils:replaceListItem(N, OldRiN + 1, Ri),
             NewConfig = { I, C, E, NewRi, Xi },
             Pid ! {c_get, Object},
-            NewState = {Servers, Data, NewConfig},%dgr:dgr({Servers, Data, NewConfig}),
+            NewState = dgr:dgr({Servers, Data, NewConfig}),
             loop(NewState)
     end;
 
@@ -131,15 +131,17 @@ handleMessage({d_popul, Pid, List, UsedServers}, State = {Servers, _Data, _Confi
     Pid ! {d_popul, NewList, NewUsedServers},
     loop(State);
 
-handleMessage({d_all_m, Pid, UsedServers}, State = {Servers, _Data, _Config = { I, _C, _E, Ri, _Xi }}) ->
-    EmptyOset = oset:new(),
-    SelfUsed = oset:add_element(node(), EmptyOset),
-    ServersList = oset:to_list(Servers),
-    {Popularity, _UsedServers} = dgr:getPopularity(Ri, ServersList, SelfUsed),
+handleMessage({d_all_m, Pid, UsedServers, Popularity}, State = {Servers, _Data, _Config = { I, _C, _E, Ri, _Xi }}) ->
+    io:format("Main loop: Received message: ~p~n", [{d_all_m, Pid, oset:to_list(UsedServers), Popularity}]),
+    io:format("Main loop: P = ~p~n", [Popularity]),
     Ig = s_utils:initIg(Ri, Popularity),
+    io:format("Main loop: Ig = ~p~n", [Ig]),
     {IgMax, J} = s_utils:findIgMax(Ig),
     SendMsg = {IgMax, I, J, 0},
-    {MessagesList, UpdatedUsedServers} = dgr:getAllMessages(oset:to_list(Servers), UsedServers),
+    io:format("Main loop: SendMsg = ~p~n", [SendMsg]),
+    {MessagesList, UpdatedUsedServers} = dgr:getAllMesagges(oset:to_list(Servers), UsedServers, Popularity),
+    io:format("Main loop: MessagesList = ~p~n", [MessagesList]),
+    io:format("Main loop: Send message: ~p ! ~p~n", [Pid, {d_all_m, [SendMsg] ++ MessagesList, oset:to_list(UpdatedUsedServers)}]),
     Pid ! {d_all_m, [SendMsg] ++ MessagesList, UpdatedUsedServers},
     loop(State);
 

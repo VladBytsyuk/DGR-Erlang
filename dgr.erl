@@ -9,19 +9,27 @@
 
 
 dgr(_State = {Servers, Data, _Config = {I, C, _E, Ri, _Xi}}) ->
+    io:format("DGR: start~n~n"),
     EmptyOset = oset:new(),
     SelfUsed = oset:add_element(node(), EmptyOset),
     ServersList = oset:to_list(Servers),
     {Popularity, _UsedServers} = getPopularity(Ri, ServersList, SelfUsed),
     MaxNumber = s_utils:findMaxNumber(0, ServersList, EmptyOset, Data),
-    NewXi = s_utils:fillList(MaxNumber + 1, 0),
+    NewXi = s_utils:fillList(MaxNumber, 0),
     NewE = C,
     Ig = s_utils:initIg(Ri, Popularity),
-    Ec = s_utils:fillList(MaxNumber + 1, 0),
-    Rc = s_utils:fillList(MaxNumber + 1, 0),
+    Ec = s_utils:fillList(MaxNumber, 0),
+    Rc = s_utils:fillList(MaxNumber, 0),
     {IgMax, J} = s_utils:findIgMax(Ig),
     SendMsg = {IgMax, I, J, 0},
-    RecvMsg = allReduceMax(SendMsg, Servers),
+    io:format("DGR: P = ~p~n", [Popularity]),
+    io:format("DGR: Xi = ~p~n", [NewXi]),
+    io:format("DGR: E = ~p~n", [NewE]),
+    io:format("DGR: Ig = ~p~n", [Ig]),
+    io:format("DGR: Ec = ~p~n", [Ec]),
+    io:format("DGR: Rc = ~p~n~n", [Rc]),
+    RecvMsg = allReduceMax(SendMsg, Servers, Popularity),
+    io:format("DGR: allReduceMax(~p, ~p) = ~p~n~n", [SendMsg, oset:to_list(Servers), RecvMsg]),
     NewConfig = whileLoop(RecvMsg, {I, C, NewE, Ri, NewXi}, {Popularity, MaxNumber, Ig, Ec, Rc}, Servers),
     {Servers, Data, NewConfig}.
 
@@ -30,52 +38,60 @@ getPopularity(List, _ServersList = [H | T], UsedServers) ->
     case oset:is_element(H, UsedServers) of
         true  -> getPopularity(List, T, UsedServers);
         false -> 
+            io:format("Popularity: Send message: ~p ! ~p~n", [H, {d_popul, {serverPid, node()}, List, UsedServers}]),
             {serverPid, H} ! {d_popul, {serverPid, node()}, List, UsedServers},
             receive
-                {d_popul, NewList, NewUsedServers} -> getPopularity(NewList, T, NewUsedServers)
+                {d_popul, NewList, NewUsedServers} -> 
+                    io:format("Popularity: Received message: ~p~n", [{d_popul, NewList, NewUsedServers}]),
+                    getPopularity(NewList, T, NewUsedServers)
             end
     end.
 
 
-allReduceMax(SendMsg, Servers) -> 
+allReduceMax(SendMsg, Servers, Popularity) -> 
     UsedServers = oset:add_element(node(), oset:new()),
-    allReduceMax(SendMsg, Servers, UsedServers).
+    allReduceMax(SendMsg, Servers, UsedServers, Popularity).
     
-allReduceMax(SendMsg, Servers, UsedServers) ->
-    MessagesList = getAllMesagges(oset:to_list(Servers), UsedServers),
+allReduceMax(SendMsg, Servers, UsedServers, Popularity) ->
+    {MessagesList, _UsedServers} = getAllMesagges(oset:to_list(Servers), UsedServers, Popularity),
+    io:format("DGR: allReduceMax:MessagesList = ~p~n", [MessagesList]),
     findMaxMessage(MessagesList, SendMsg).
 
-getAllMesagges(ServersList = [], UsedServers) -> {ServersList, UsedServers};
-getAllMesagges(_ServersList = [H | T], UsedServers) -> 
+getAllMesagges(_ServersList = [], UsedServers, _Popularity) -> {[], UsedServers};
+getAllMesagges(_ServersList = [H | T], UsedServers, Popularity) -> 
     case oset:is_element(H, UsedServers) of
-        true  -> getAllMesagges(T, UsedServers);
+        true  -> getAllMesagges(T, UsedServers, Popularity);
         false -> 
             NewUsedServers = oset:add_element(H, UsedServers),
-            {serverPid, H} ! {d_all_m, {serverPid, node()}, NewUsedServers},
+            io:format("DGR: Send message: ~p ! ~p~n", [H, {d_all_m, {serverPid, node()}, oset:to_list(NewUsedServers), Popularity}]),
+            {serverPid, H} ! {d_all_m, {serverPid, node()}, NewUsedServers, Popularity},
             receive
                 {d_all_m, MessagesList, UpdatedUsedServers} -> 
-                    {Messages, NewUpdatedUsedServers} = getAllMesagges(T, UpdatedUsedServers),
+                    io:format("DGR: Received message: ~p~n", [{d_all_m, MessagesList, oset:to_list(UpdatedUsedServers)}]),
+                    {Messages, NewUpdatedUsedServers} = getAllMesagges(T, UpdatedUsedServers, Popularity),
                     {MessagesList ++ Messages, oset:union(UpdatedUsedServers, NewUpdatedUsedServers)}
             end      
     end.
 
 findMaxMessage(_MessageList = [], Msg) -> Msg;
-findMaxMessage(_MessageList = [H = {HIgMax, _HI, _HJ, _HJ_} | T], _Msg = {IgMax, _I, _J, _J_}) when HIgMax > IgMax ->
-    findMaxMessage(T, H);
-findMaxMessage(_MessageList = [_H = {_HIgMax, _HI, _HJ, _HJ_} | T], Msg) ->
-    findMaxMessage(T, Msg).
+findMaxMessage(_MessageList = [H = {HIgMax, _HI, _HJ, _HJ_} | T], _Msg = {IgMax, _I, _J, _J_}) when HIgMax > IgMax -> findMaxMessage(T, H);
+findMaxMessage(_MessageList = [_H = {_HIgMax, _HI, _HJ, _HJ_} | T], Msg) -> findMaxMessage(T, Msg).
 
 
 whileLoop(RecvMsg = {IgMax, _I_, _J, _J_}, 
             Config = {I, C, E, Ri, _Xi},
             Buf = {P, MaxNumber, Ig, Ec, _Rc},
             Servers) when IgMax > 0 ->
+    io:format("While :~n"),
+    io:format(" Config : ~p~n", [Config]),
+    io:format(" Buf : ~p~n", [Buf]),
+    io:format(" Servers : ~p~n~n", [oset:to_list(Servers)]),
     {ResXi, ResIg, ResEc, ResE, ResRc} = igIf(RecvMsg, Config, Buf),
     {NewIgMax, NewJ} = s_utils:findIgMax(Ig),
     {NewEcMin, NewJ_} = s_utils:findEcMin(Ec),
     {ResIgMax, ResJ_} = terminateIf(E, C, MaxNumber + 1, NewIgMax, NewJ_, NewEcMin),
     SendMsg = {ResIgMax, I, NewJ, ResJ_},
-    NewRecvMsg = allReduceMax(SendMsg, Servers),
+    NewRecvMsg = allReduceMax(SendMsg, Servers, P),
     whileLoop(NewRecvMsg, {I, C, ResE, Ri, ResXi}, {P, MaxNumber, ResIg, ResEc, ResRc}, Servers);
 whileLoop(_RecvMsg, Config, _Buf, _Servers) -> Config.
 

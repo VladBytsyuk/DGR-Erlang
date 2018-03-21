@@ -98,15 +98,13 @@ findMaxNumberRemote(Max, _ServersList = [H | T], UsedServers) ->
             end
     end.
 
-
 % Replaced list item by Index, on Value in List
 replaceListItem(0, Value, _List = [_H | T]) -> [Value] ++ T;
 replaceListItem(Index, Value, _List = [H | T]) -> [H] ++ replaceListItem(Index - 1, Value, T).
 
-
 % Forms new (Updates old) object and put it into Data
 tryToAddObject(value_not_found, State = {Servers, Data, _Config = { I, C, _E, Ri, Xi }}, Key, Value) ->
-    Number = findMaxNumber(-1, oset:to_list(Servers), oset:new(), Data) + 1,
+    Number = findMaxNumber(0, oset:to_list(Servers), oset:new(), Data) + 1,
     Object = {Key, Value, Number},
     NewData = oset:add_element(Object, Data),
     notifyObjectAdded(State),
@@ -122,7 +120,6 @@ tryToAddObject(Object, _State = {_Servers, Data, Config}, _Key, Value) ->
 getListItem(_Index, _List = []) -> {error, index_greater_than_list_size};
 getListItem(0, _List = [H | _T]) -> H;
 getListItem(Index, _List = [_H | T]) -> getListItem(Index - 1, T).
-
 
 listLength(_List = []) -> 0;
 listLength(_List = [_H | T]) -> listLength(T) + 1.
@@ -146,6 +143,7 @@ findIgMax(Ig) -> findIgMax(0, -1, -1, Ig).
 findIgMax(Max, J, _Index, _Ig = []) -> {Max, J};
 findIgMax(Max, J, Index, _Ig = [H | T]) when Max > H -> findIgMax(Max, J, Index + 1, T);
 findIgMax(_Max, _J, Index, _Ig = [H | T]) -> findIgMax(H, Index, Index + 1, T).
+
 findEcMin(Ec) -> findEcMin(9999999, -1, -1, Ec).
 findEcMin(Min, J, _Index, _Ec = []) -> {Min, J};
 findEcMin(Min, J, Index, _Ec = [H | T]) when Min < H -> findEcMin(Min, J, Index + 1, T);
