@@ -74,17 +74,13 @@ handleMessage({s_stopped, Pid, StoppedName, UsedServers}, _State = {Servers, Dat
 
 % Set data from client
 handleMessage({c_set, Pid, Key, Value}, State = {Servers, _Data, _Config}) ->
-    io:format("Client -> Set {~p, ~p}~n", [Key, Value]),
     Object = s_utils:findObject(Key, State),
-    io:format("Object in system - ~p~n", [Object]),
     {NewObject, NewData, NewConfig} = s_utils:tryToAddObject(Object, State, Key, Value),
     Pid ! {c_set, NewObject}, 
-    %NewState = dgr:dgr({Servers, NewData, NewConfig}),
     loop({Servers, NewData, NewConfig});
 
 % Get data to client
 handleMessage({c_get, Pid, Key}, State = {Servers, Data, Config}) ->
-    io:format("Client -> Get {~p}~n", [Key]),
     Object = s_utils:findObject(Key, State),
     case Object of 
         value_not_found ->
@@ -132,16 +128,10 @@ handleMessage({d_popul, Pid, List, UsedServers}, State = {Servers, _Data, _Confi
     loop(State);
 
 handleMessage({d_all_m, Pid, UsedServers, Popularity}, State = {Servers, _Data, _Config = { I, _C, _E, Ri, _Xi }}) ->
-    io:format("Main loop: Received message: ~p~n", [{d_all_m, Pid, oset:to_list(UsedServers), Popularity}]),
-    io:format("Main loop: P = ~p~n", [Popularity]),
     Ig = s_utils:initIg(Ri, Popularity),
-    io:format("Main loop: Ig = ~p~n", [Ig]),
     {IgMax, J} = s_utils:findIgMax(Ig),
     SendMsg = {IgMax, I, J, 0},
-    io:format("Main loop: SendMsg = ~p~n", [SendMsg]),
     {MessagesList, UpdatedUsedServers} = dgr:getAllMesagges(oset:to_list(Servers), UsedServers, Popularity),
-    io:format("Main loop: MessagesList = ~p~n", [MessagesList]),
-    io:format("Main loop: Send message: ~p ! ~p~n", [Pid, {d_all_m, [SendMsg] ++ MessagesList, oset:to_list(UpdatedUsedServers)}]),
     Pid ! {d_all_m, [SendMsg] ++ MessagesList, UpdatedUsedServers},
     loop(State);
 

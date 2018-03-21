@@ -99,7 +99,8 @@ findMaxNumberRemote(Max, _ServersList = [H | T], UsedServers) ->
     end.
 
 % Replaced list item by Index, on Value in List
-replaceListItem(0, Value, _List = [_H | T]) -> [Value] ++ T;
+replaceListItem(1, Value, _List = []) -> [Value];
+replaceListItem(1, Value, _List = [_H | T]) -> [Value] ++ T;
 replaceListItem(Index, Value, _List = [H | T]) -> [H] ++ replaceListItem(Index - 1, Value, T).
 
 % Forms new (Updates old) object and put it into Data
@@ -118,11 +119,11 @@ tryToAddObject(Object, _State = {_Servers, Data, Config}, _Key, Value) ->
 
 % Get list item by index
 getListItem(_Index, _List = []) -> {error, index_greater_than_list_size};
-getListItem(0, _List = [H | _T]) -> H;
+getListItem(1, _List = [H | _T]) -> H;
 getListItem(Index, _List = [_H | T]) -> getListItem(Index - 1, T).
 
 listLength(_List = []) -> 0;
-listLength(_List = [_H | T]) -> listLength(T) + 1.
+listLength(_List = [_H | T]) -> 1 + listLength(T).
 
 sum(_ListA = [], _ListB = []) -> [];
 sum(ListA = [HA | TA], ListB = [HB | TB]) ->
