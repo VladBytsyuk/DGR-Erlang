@@ -99,9 +99,15 @@ findMaxNumberRemote(Max, _ServersList = [H | T], UsedServers) ->
     end.
 
 % Replaced list item by Index, on Value in List
-replaceListItem(1, Value, _List = []) -> [Value];
-replaceListItem(1, Value, _List = [_H | T]) -> [Value] ++ T;
-replaceListItem(Index, Value, _List = [H | T]) -> [H] ++ replaceListItem(Index - 1, Value, T).
+replaceListItem(Index, _Value, _List) when Index =< 0 -> {error, index_less_than_one};
+replaceListItem(Index, Value, List) -> 
+    case Index > listLength(List) of
+        true  -> {error, index_greater_than_list_size};
+        false -> replaceListItemCorrect(Index, Value, List)
+    end.
+replaceListItemCorrect(1, Value, _List = []) -> [Value];
+replaceListItemCorrect(1, Value, _List = [_H | T]) -> [Value] ++ T;
+replaceListItemCorrect(Index, Value, _List = [H | T]) -> [H] ++ replaceListItemCorrect(Index - 1, Value, T).
 
 % Forms new (Updates old) object and put it into Data
 tryToAddObject(value_not_found, State = {Servers, Data, _Config = { I, C, _E, Ri, Xi }}, Key, Value) ->
@@ -118,20 +124,26 @@ tryToAddObject(Object, _State = {_Servers, Data, Config}, _Key, Value) ->
     {NewObject, NewData, Config}.
 
 % Get list item by index
+getListItem(Index, _List) when Index =< 0 -> {error, index_less_than_one};
 getListItem(_Index, _List = []) -> {error, index_greater_than_list_size};
 getListItem(1, _List = [H | _T]) -> H;
 getListItem(Index, _List = [_H | T]) -> getListItem(Index - 1, T).
 
 listLength(_List = []) -> 0;
-listLength(_List = [_H | T]) -> 1 + listLength(T).
+listLength(_List = [_H | T]) -> 1 + listLength(T);
+listLength(_Other) -> {error, not_list}.
 
 sum(_ListA = [], _ListB = []) -> [];
+sum(_listA = [], _ListB) -> {error, lists_have_different_lengths};
+sum(_listA, _ListB = []) -> {error, lists_have_different_lengths};
 sum(ListA = [HA | TA], ListB = [HB | TB]) ->
     case listLength(ListA) =/= listLength(ListB) of
         true  -> {error, lists_have_different_lengths};
         false -> [HA + HB] ++ sum(TA, TB)
-    end.
+    end;
+sum(_OtherA, _OtherB) -> {error, arguments_contain_not_list}.
 
+fillList(Length, _Value) when Length < 0 -> {error, length_less_than_zero};
 fillList(Length, _Value) when Length == 0 -> [];
 fillList(Length, Value) ->  [Value] ++ fillList(Length - 1, Value).
 
