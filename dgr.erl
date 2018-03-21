@@ -3,8 +3,8 @@
 
 -define(IF(Condition, True, False), (case (Condition) of true -> (True); false -> (False) end)).
 -define(MAX(A, B), (case (A > B) of true -> A; false -> B end)).
--define(TS, 2).
--define(TR, 2).
+-define(TS, 9).
+-define(TR, 5).
 -define(TL, 2).
 
 
@@ -38,12 +38,9 @@ getPopularity(List, _ServersList = [H | T], UsedServers) ->
     case oset:is_element(H, UsedServers) of
         true  -> getPopularity(List, T, UsedServers);
         false -> 
-            io:format("Popularity: Send message: ~p ! ~p~n", [H, {d_popul, {serverPid, node()}, List, UsedServers}]),
             {serverPid, H} ! {d_popul, {serverPid, node()}, List, UsedServers},
             receive
-                {d_popul, NewList, NewUsedServers} -> 
-                    io:format("Popularity: Received message: ~p~n", [{d_popul, NewList, NewUsedServers}]),
-                    getPopularity(NewList, T, NewUsedServers)
+                {d_popul, NewList, NewUsedServers} -> getPopularity(NewList, T, NewUsedServers)
             end
     end.
 
@@ -79,14 +76,14 @@ findMaxMessage(_MessageList = [_H = {_HIgMax, _HI, _HJ, _HJ_} | T], Msg) -> find
 
 
 whileLoop(RecvMsg = {IgMax, _I_, _J, _J_}, 
-            Config = {I, C, E, Ri, _Xi},
-            Buf = {P, MaxNumber, Ig, Ec, _Rc},
+            Config = {I, C, E, Ri, Xi},
+            Buf = {P, MaxNumber, Ig, Ec, Rc},
             Servers) when IgMax > 0 ->
     io:format("While :~n"),
     io:format(" Config : ~p~n", [Config]),
     io:format(" Buf : ~p~n", [Buf]),
     io:format(" Servers : ~p~n~n", [oset:to_list(Servers)]),
-    {ResXi, ResIg, ResEc, ResE, ResRc} = igIf(RecvMsg, Config, Buf),
+    {ResXi, ResIg, ResEc, ResE, ResRc} = igIf(RecvMsg, Config, {P, MaxNumber, Xi, E, Ig, Ec, Rc}),
     {NewIgMax, NewJ} = s_utils:findIgMax(Ig),
     {NewEcMin, NewJ_} = s_utils:findEcMin(Ec),
     {ResIgMax, ResJ_} = terminateIf(E, C, MaxNumber + 1, NewIgMax, NewJ_, NewEcMin),
@@ -109,7 +106,7 @@ igIf(_RecvMsg = {_IgMax, _I_, J, J_},
         _Config = {_I, _C, E, Ri, _Xi},
         _Buf = {P, _MaxNumber, NewXi, E, Ig, Ec, Rc}) ->
     NewRc = s_utils:replaceListItem(J, s_utils:getListItem(J, Rc) + 1, Rc),
-    {NewIg, NewEc} = s_utils:replicaIf(s_utils:getListItem(J, NewXi), s_utils:getListItem(J, Ri), J, Ig, Ec),
+    {NewIg, NewEc} = replicaIf(s_utils:getListItem(J, NewXi), s_utils:getListItem(J, Ri), J, Ig, Ec),
     {ResultRc, ResultEc} = evictedIfIgOther(J_, NewXi, Ri, P, NewRc, NewEc),
     {NewXi, NewIg, ResultEc, E, ResultRc}.
 

@@ -4,8 +4,8 @@
 
 -define(IF(Condition, True, False), (case (Condition) of true -> (True); false -> (False) end)).
 -define(MAX(A, B), (case (A > B) of true -> A; false -> B end)).
--define(TS, 2).
--define(TR, 2).
+-define(TS, 18).
+-define(TR, 5).
 -define(TL, 2).
 
 % Notify all neighbor-servers that current server was stopped
@@ -152,7 +152,7 @@ initIg(_Ri = [HRi | TRi], _P = [HP | TP]) ->
     Value = HRi * (?TR - ?TL) + HP * (?TS -?TR),
     [Value] ++ initIg(TRi, TP).
 
-findIgMax(Ig) -> findIgMax(0, -1, -1, Ig).
+findIgMax(Ig) -> findIgMax(-1, 1, 1, Ig).
 findIgMax(Max, J, _Index, _Ig = []) -> {Max, J};
 findIgMax(Max, J, Index, _Ig = [H | T]) when Max > H -> findIgMax(Max, J, Index + 1, T);
 findIgMax(_Max, _J, Index, _Ig = [H | T]) -> findIgMax(H, Index, Index + 1, T).
