@@ -86,7 +86,7 @@ whileLoop(RecvMsg = {IgMax, _I_, _J, _J_},
     {ResXi, ResIg, ResEc, ResE, ResRc} = igIf(RecvMsg, Config, {P, MaxNumber, Xi, E, Ig, Ec, Rc}),
     {NewIgMax, NewJ} = s_utils:findIgMax(Ig),
     {NewEcMin, NewJ_} = s_utils:findEcMin(Ec),
-    {ResIgMax, ResJ_} = terminateIf(E, C, MaxNumber + 1, NewIgMax, NewJ_, NewEcMin),
+    {ResIgMax, ResJ_} = terminateIf(E, C, MaxNumber, NewIgMax, NewJ_, NewEcMin),
     SendMsg = {ResIgMax, I, NewJ, ResJ_},
     NewRecvMsg = allReduceMax(SendMsg, Servers, P),
     whileLoop(NewRecvMsg, {I, C, ResE, Ri, ResXi}, {P, MaxNumber, ResIg, ResEc, ResRc}, Servers);
