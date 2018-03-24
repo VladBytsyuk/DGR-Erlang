@@ -77,12 +77,13 @@ findMaxMessage(_MessageList = [_H = {_HIgMax, _HI, _HJ, _HJ_} | T], Msg) -> find
 
 whileLoop(RecvMsg = {IgMax, _I_, _J, _J_}, 
             Config = {I, C, E, Ri, Xi},
-            Buf = {P, MaxNumber, Ig, Ec, Rc},
+            _Buf = {P, MaxNumber, Ig, Ec, Rc},
             Servers) when IgMax > 0 ->
     io:format("While :~n"),
-    io:format(" Config : ~p~n", [Config]),
-    io:format(" Buf : ~p~n", [Buf]),
-    io:format(" Servers : ~p~n~n", [oset:to_list(Servers)]),
+    io:format(" IgMax = ~p~n~n", [IgMax]),
+    %io:format(" Config : ~p~n", [Config]),
+    %io:format(" Buf : ~p~n", [Buf]),
+    %io:format(" Servers : ~p~n~n", [oset:to_list(Servers)]),
     {ResXi, ResIg, ResEc, ResE, ResRc} = igIf(RecvMsg, Config, {P, MaxNumber, Xi, E, Ig, Ec, Rc}),
     {NewIgMax, NewJ} = s_utils:findIgMax(Ig),
     {NewEcMin, NewJ_} = s_utils:findEcMin(Ec),
