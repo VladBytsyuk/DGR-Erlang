@@ -75,3 +75,18 @@ fillList_test() ->
         ?assert(s_utils:fillList( 3, a) =:= [a, a, a]),
         ?assert(s_utils:fillList( 4, a) =:= [a, a, a, a])
     ].
+
+removeObjectByNumber_test() ->
+    EmptyOset = oset:new(),
+    OsetA = oset:add_element({a, 42, 1}, EmptyOset),
+    OsetAB = oset:add_element({b, brain, 2}, OsetA),
+    OsetABC = oset:add_element({c, clone, 3}, OsetAB),
+    [
+        ?assert(s_utils:removeObjectByNumber(EmptyOset, 0) =:= {error, no_object_with_current_number}),
+        ?assert(s_utils:removeObjectByNumber(EmptyOset, 1) =:= {error, no_object_with_current_number}),
+        ?assert(s_utils:removeObjectByNumber(EmptyOset, 2) =:= {error, no_object_with_current_number}),
+        ?assert(s_utils:removeObjectByNumber(OsetABC, 0) =:= {error, no_object_with_current_number}),
+        ?assert(oset:to_list(s_utils:removeObjectByNumber(OsetABC, 1)) =:= oset:to_list(oset:del_element({a, 42, 1}, OsetABC))),
+        ?assert(oset:to_list(s_utils:removeObjectByNumber(OsetABC, 3)) =:= oset:to_list(OsetAB)),
+        ?assert(s_utils:removeObjectByNumber(OsetABC, 4) =:= {error, no_object_with_current_number})
+    ].

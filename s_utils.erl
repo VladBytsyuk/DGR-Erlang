@@ -161,3 +161,16 @@ findEcMin(Ec) -> findEcMin(9999999, -1, -1, Ec).
 findEcMin(Min, J, _Index, _Ec = []) -> {Min, J};
 findEcMin(Min, J, Index, _Ec = [H | T]) when Min < H -> findEcMin(Min, J, Index + 1, T);
 findEcMin(_Min, _J, Index, _Ec = [H | T]) -> findEcMin(H, Index, Index + 1, T).
+
+
+findObjectWithNumber(_DataList = [], _Number) -> {error, no_such_object};
+findObjectWithNumber(_DataList = [Object = {_K, _V, N} | _T], Number) when N == Number -> Object;
+findObjectWithNumber(_DataList = [_H | T], Number) -> findObjectWithNumber(T, Number);
+findObjectWithNumber(Data, Number) -> findObjectWithNumber(oset:to_list(Data), Number).
+
+removeObject(_Data, Object) when Object =:= {error, no_such_object} -> {error, no_object_with_current_number};
+removeObject(Data, Object) -> oset:del_element(Object, Data).
+
+removeObjectByNumber(Data, Number) -> 
+    Object = findObjectWithNumber(Data, Number),
+    removeObject(Data, Object).
