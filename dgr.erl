@@ -101,7 +101,7 @@ igIf(_RecvMsg = {_IgMax, I_, J, J_},
         _Servers,
         Data,
         _Config = {I, _C, E, _Ri, _Xi},
-        _Buf = {_P, _MaxNumber, NewXi, E, Ig, Ec, Rc}) when I_ == I andalso E > 0 ->
+        _Buf = {_P, _MaxNumber, NewXi, E, Ig, Ec, Rc}) when I_ == I ->
     UpdatedXi = s_utils:replaceListItem(J, 1, NewXi),
     Object = s_utils:findObjectWithNumber(Objects, J),
     NewData = oset:add_element(Object, Data),    
