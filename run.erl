@@ -1,6 +1,6 @@
 -module(run).
 
--import(server, [start/2, slink/1]).
+-import(server, [start/3, slink/1]).
 -import(client, [cstart/1, set/2]).
 
 -export([server/1, client/1, cfill/0]).
@@ -10,10 +10,10 @@ client(ServerNameList) ->
     cstart(list_to_atom(ServerName)).
 
 server(Args) -> 
-    [NumberString, CapacityString | NeighborNames] = Args,
+    [NumberString, CapacityString, BarrierNode | NeighborNames] = Args,
     {Number, _} = string:to_integer(NumberString),
     {Capacity, _} = string:to_integer(CapacityString),
-    start(Number, Capacity),
+    start(Number, Capacity, {barrier, list_to_atom(BarrierNode)}),
     case NeighborNames == ["empty"] of
         false -> linkNeighbors(NeighborNames);
         true  -> ok

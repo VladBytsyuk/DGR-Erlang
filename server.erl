@@ -1,12 +1,14 @@
 -module(server).
--export([start/2, stop/0, slink/1]).
+-export([start/3, stop/0, slink/1]).
 
 % Macro
 -define(IF(Condition, True, False), (case (Condition) of true -> (True); false -> (False) end)).
 -define(MAX(A, B), (case (A > B) of true -> A; false -> B end)).
 
 % Exported functions
-start(Number, Capacity) -> 
+start(Number, Capacity, BarrierPid) -> 
+    {barrier, BarrierNode} = BarrierPid,
+    net_kernel:connect_node(BarrierNode),
     register(serverPid, spawn(fun() -> 
         loop({_LinkedServers = oset:new(), 
                 _Data = oset:new(), 
@@ -21,7 +23,8 @@ start(Number, Capacity) ->
                     _Ri = [],
                     % Вектор реплик объектов
                     _Xi = []
-                }
+                }, 
+                BarrierPid
         }) 
     end)).
 
@@ -41,9 +44,9 @@ loop(State) ->
     end.
 
 printState(State) ->
-    {Servers, Data, _Config = {I, C, E, Ri, Xi}} = State,
+    {Servers, Data, _Config = {I, C, E, Ri, Xi}, BarrierPid} = State,
     io:format("~n", []),
-    io:format("State:~n", []),
+    io:format("~p State:~n", [node()]),
     io:format(" Servers: ~p~n", [oset:to_list(Servers)]),
     io:format(" Data: ~p~n", [oset:to_list(Data)]),
     io:format(" Config:~n", []),
@@ -52,6 +55,7 @@ printState(State) ->
     io:format("     Server space left: ~p~n", [E]),
     io:format("     Ri: ~p~n", [Ri]),
     io:format("     Xi: ~p~n", [Xi]),
+    io:format(" Barrier: ~p~n", [BarrierPid]),
     io:format("~n", []).
 
 %% ================================================================================================
@@ -61,26 +65,26 @@ printState(State) ->
 %% ================================================================================================
 
 % Current server was stopped
-handleMessage(stop, _State = {Servers, _Data, _Config}) -> 
+handleMessage(stop, _State = {Servers, _Data, _Config, BarrierPid}) -> 
     io:format("Stop~n",[]),
-    s_utils:notifyStop(oset:to_list(Servers), oset:new(), node());
+    s_utils:notifyStop(oset:to_list(Servers), oset:new(), node(), BarrierPid);
 
 % Remote server was stopped
-handleMessage({s_stopped, Pid, StoppedName, UsedServers}, _State = {Servers, Data, Config}) ->
+handleMessage({s_stopped, Pid, StoppedName, UsedServers}, _State = {Servers, Data, Config, BarrierPid}) ->
     NewServers = oset:del_element(StoppedName, Servers),
     {ok, notifyStop, StoppedName, UpdatedUsedServers} = s_utils:notifyStop(oset:to_list(NewServers), UsedServers, StoppedName),
     Pid ! {s_stopped, UpdatedUsedServers},
-    loop({NewServers, Data, Config});
+    loop({NewServers, Data, Config, BarrierPid});
 
 % Set data from client
-handleMessage({c_set, Pid, Key, Value}, State = {Servers, _Data, _Config}) ->
+handleMessage({c_set, Pid, Key, Value}, State = {Servers, _Data, _Config, BarrierPid}) ->
     Object = s_utils:findObject(Key, State),
-    {NewObject, NewData, NewConfig} = s_utils:tryToAddObject(Object, State, Key, Value),
+    {NewObject, NewData, NewConfig, _BarrierPid} = s_utils:tryToAddObject(Object, State, Key, Value),
     Pid ! {c_set, NewObject}, 
-    loop({Servers, NewData, NewConfig});
+    loop({Servers, NewData, NewConfig, BarrierPid});
 
 % Get data to client
-handleMessage({c_get, Pid, Key}, State = {Servers, Data, Config}) ->
+handleMessage({c_get, Pid, Key}, State = {Servers, Data, Config, BarrierPid}) ->
     Object = s_utils:findObject(Key, State),
     case Object of 
         value_not_found ->
@@ -92,11 +96,10 @@ handleMessage({c_get, Pid, Key}, State = {Servers, Data, Config}) ->
             NewRi = s_utils:replaceListItem(N, OldRiN + 1, Ri),
             NewConfig = { I, C, E, NewRi, Xi },
             Pid ! {c_get, Object},
-            NewState = dgr:dgr({Servers, Data, NewConfig}),
-            loop(NewState)
+            loop({Servers, Data, NewConfig, BarrierPid})
     end;
 
-handleMessage({s_get, ServerPid, Key, UsedServers}, State = {Servers, Data, _Config}) ->
+handleMessage({s_get, ServerPid, Key, UsedServers}, State = {Servers, Data, _Config, _BarrierPid}) ->
     LocalObject = s_utils:findObjectLocal(Key, oset:to_list(Data)),
     case LocalObject == value_not_found of
         true  -> 
@@ -108,34 +111,52 @@ handleMessage({s_get, ServerPid, Key, UsedServers}, State = {Servers, Data, _Con
     loop(State);
 
 % Update server config on adding object
-handleMessage({s_obj_add, Pid,  UsedServers}, _State = {Servers, Data, _Config = {I, C, E, Ri, Xi}}) ->
+handleMessage({s_obj_add, Pid,  UsedServers}, _State = {Servers, Data, _Config = {I, C, E, Ri, Xi}, BarrierPid}) ->
     NewConfig = { I, C, E, Ri ++ [0], Xi ++ [0]},
     {ok, notifyObjectAdded, NewUsedServers} = s_utils:notifyObjectAdded(oset:to_list(Servers), UsedServers),
     Pid ! {s_obj_add, NewUsedServers},
-    loop({Servers, Data, NewConfig});
+    loop({Servers, Data, NewConfig, BarrierPid});
 
 % Find maximum of objects naumber
-handleMessage({s_max_num, ServerPid, Max, UsedServers}, State = {Servers, Data, _Config}) ->
+handleMessage({s_max_num, ServerPid, Max, UsedServers}, State = {Servers, Data, _Config, _BarrierPid}) ->
     LocalMax  = s_utils:findMaxNumberLocal(Max, oset:to_list(Data)),
     {RemoteMax, UpdatedUsedServers} = s_utils:findMaxNumberRemote(Max, oset:to_list(Servers), UsedServers),
     RealMax = ?MAX(LocalMax, RemoteMax),
     ServerPid ! {s_max_num, RealMax, UpdatedUsedServers},
     loop(State);
 
-handleMessage({d_popul, Pid, List, UsedServers}, State = {Servers, _Data, _Config = { _I, _C, _E, Ri, _Xi }}) ->
+handleMessage({d_popul, Pid, List, UsedServers}, State = {Servers, _Data, _Config = { _I, _C, _E, Ri, _Xi }, _BarrierPid}) ->
     {NewList, NewUsedServers} = dgr:getPopularity(s_utils:sum(List, Ri), oset:to_list(Servers), oset:add_element(node(), UsedServers)),
     Pid ! {d_popul, NewList, NewUsedServers},
     loop(State);
 
-handleMessage({d_all_m, Pid, UsedServers, Popularity}, State = {Servers, _Data, _Config = { I, _C, _E, Ri, _Xi }}) ->
-    Ig = s_utils:initIg(Ri, Popularity),
-    {IgMax, J} = s_utils:findIgMax(Ig),
-    SendMsg = {IgMax, I, J, 0},
-    {MessagesList, UpdatedUsedServers} = dgr:getAllMesagges(oset:to_list(Servers), UsedServers, Popularity),
-    Pid ! {d_all_m, [SendMsg] ++ MessagesList, UpdatedUsedServers},
+
+handleMessage({d_data, Pid, UsedServers}, State = {Servers, Data, _Config, _BarrierPid}) ->
+    {Objects, NewUsedServers} = s_utils:getAllObjects(oset:to_list(Servers), Data, UsedServers),
+    Pid ! {d_data, Objects, NewUsedServers},
     loop(State);
 
+handleMessage(d_dgr, State = {Servers, Data, _Config = {_I, _C, _E, Ri, _Xi}, BarrierPid}) ->
+    BarrierPid ! start,
+    
+    UsedServers = oset:add_element(node(), oset:new()),
+
+    {Popularity, _UsedServers} = dgr:getPopularity(Ri, oset:to_list(Servers), UsedServers),
+    io:format(" Popularity: ~p~n", [Popularity]),
+   
+    {Objects, _NewUsedServers} = s_utils:getAllObjects(oset:to_list(Servers), Data, UsedServers),
+    ObjectsList = oset:to_list(Objects),
+    io:format(" Objects: ~p~n", [ObjectsList]),
+
+    s_utils:dgrNotify(Popularity, ObjectsList, oset:to_list(Servers), UsedServers),
+    loop(dgr:dgr(State, Popularity, ObjectsList, initiator));
+
+handleMessage({d_dgr, Pid, Popularity, ObjectsList, UsedServers}, State = {Servers, _Data, _Config, _BarrierPid}) ->
+    UpdatedUsedServers = s_utils:dgrNotify(Popularity, ObjectsList, oset:to_list(Servers), oset:add_element(node(), UsedServers)),
+    Pid ! {d_dgr, UpdatedUsedServers},
+    loop(dgr:dgr(State, Popularity, ObjectsList, no_initiator));
+
 % Link servers with each other
-handleMessage({link, ServerName}, _State = {ServersList, DataList, Config}) ->
+handleMessage({link, ServerName}, _State = {ServersList, DataList, Config, BarrierPid}) ->
     NewServersList = oset:add_element(ServerName, ServersList),
-    loop({NewServersList, DataList, Config}).
+    loop({NewServersList, DataList, Config, BarrierPid}).

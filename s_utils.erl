@@ -23,7 +23,7 @@ notifyStop(_ServersList = [H | T], UsedServers, StoppedName) ->
 
 
 % Notify all servers that new object was addeda
-notifyObjectAdded(_State = {Servers, _Data, _Config}) ->
+notifyObjectAdded(_State = {Servers, _Data, _Config, _BarrierPid}) ->
     EmptyOset = oset:new(),
     UsedServers = oset:add_element(node(), EmptyOset),
     notifyObjectAdded(oset:to_list(Servers), UsedServers).
@@ -41,7 +41,7 @@ notifyObjectAdded(_ServersList = [H | T], UsedServers) ->
 
 
 % Find object on local (or remote) server
-findObject(Key, {Servers, Data, _Config}) ->
+findObject(Key, {Servers, Data, _Config, _BarrierPid}) ->
     io:format("Trying to find value for key = \"~p\"~n", [Key]),
     LocalObject = findObjectLocal(Key, oset:to_list(Data)),
     io:format("Result of local search: ~p~n", [LocalObject]),
@@ -110,18 +110,18 @@ replaceListItemCorrect(1, Value, _List = [_H | T]) -> [Value] ++ T;
 replaceListItemCorrect(Index, Value, _List = [H | T]) -> [H] ++ replaceListItemCorrect(Index - 1, Value, T).
 
 % Forms new (Updates old) object and put it into Data
-tryToAddObject(value_not_found, State = {Servers, Data, _Config = { I, C, _E, Ri, Xi }}, Key, Value) ->
+tryToAddObject(value_not_found, State = {Servers, Data, _Config = { I, C, _E, Ri, Xi }, BarrierPid}, Key, Value) ->
     Number = findMaxNumber(0, oset:to_list(Servers), oset:new(), Data) + 1,
     Object = {Key, Value, Number},
     NewData = oset:add_element(Object, Data),
     notifyObjectAdded(State),
-    NewConfig = { I, C, C - oset:size(NewData), lists:append(Ri, [0]), lists:append(Xi, [0]) },
-    {Object, NewData, NewConfig};
-tryToAddObject(Object, _State = {_Servers, Data, Config}, _Key, Value) ->
+    NewConfig = { I, C, C - oset:size(NewData), lists:append(Ri, [0]), lists:append(Xi, [1]) },
+    {Object, NewData, NewConfig, BarrierPid};
+tryToAddObject(Object, _State = {_Servers, Data, Config, BarrierPid}, _Key, Value) ->
     NewData = oset:add_element(Object, Data),
     {K, _V, N} = Object,
     NewObject = {K, Value, N},
-    {NewObject, NewData, Config}.
+    {NewObject, NewData, Config, BarrierPid}.
 
 % Get list item by index
 getListItem(Index, _List) when Index =< 0 -> {error, index_less_than_one};
@@ -174,3 +174,31 @@ removeObject(Data, Object) -> oset:del_element(Object, Data).
 removeObjectByNumber(Data, Number) -> 
     Object = findObjectWithNumber(Data, Number),
     removeObject(Data, Object).
+
+getAllObjects(_ServersList = [], Data, UsedServers) -> {Data, UsedServers};
+getAllObjects(_ServersList = [H | T], Data, UsedServers) ->
+    case oset:is_element(H, UsedServers) of
+        true  -> getAllObjects(T, Data, UsedServers);
+        false -> 
+            NewUsedServers = oset:add_element(H, UsedServers),
+            {serverPid, H} ! {d_data, {serverPid, node()}, NewUsedServers},
+            receive
+                {d_data, NewData, UpdatedUsedServers} ->
+                    UpdatedData = oset:union(Data, NewData),
+                    getAllObjects(T, UpdatedData, UpdatedUsedServers)
+            end
+    end. 
+
+dgrNotify(_Popularity, _ObjectsList, _ServersList = [], UsedServers) -> UsedServers;
+dgrNotify(Popularity, ObjectsList, _ServersList = [H | T], UsedServers) ->
+    case oset:is_element(H, UsedServers) of
+            true  -> dgrNotify(Popularity, ObjectsList, T, UsedServers);
+            false -> 
+                NewUsedServers = oset:add_element(H, UsedServers),
+                {serverPid, H} ! {d_dgr, {serverPid, node()}, Popularity, ObjectsList, NewUsedServers},
+                receive
+                    {d_dgr, UpdatedUsedServers} ->
+                        dgrNotify(Popularity, ObjectsList, T, UpdatedUsedServers)
+                end
+        end. 
+
