@@ -1,5 +1,5 @@
 -module(client).
--export([cstart/1, stop/0, set/2, get/1]).
+-export([cstart/1, stop/0, set/2, get/1, dgr/0]).
 
 cstart(ServerName) ->
     register(clientPid, spawn(fun() -> loop(ServerName) end)),
@@ -16,6 +16,10 @@ set(Key, Value) ->
 get(Key) -> 
     clientPid ! {self_get, Key},
     {ok, wait_server_response}.
+
+dgr() -> 
+    clientPid ! dgr,
+    {dgr, run}.
 
 
 
@@ -38,6 +42,9 @@ handleMessage({self_set, Key, Value}, ServerName) ->
 
 handleMessage({self_get, Key}, ServerName) ->
     {serverPid, ServerName} ! {c_get, self(), Key};
+
+handleMessage(dgr, ServerName) ->
+    {serverPid, ServerName} ! d_dgr;
 
 handleMessage({c_set, Object}, _ServerName) ->
     io:format("Set: ~p~n", [Object]),
