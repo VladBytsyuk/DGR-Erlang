@@ -3,7 +3,7 @@
 -import(server, [start/3, slink/1]).
 -import(client, [cstart/1, set/2]).
 
--export([server/1, client/1, cfill/0]).
+-export([server/1, client/1, cfill/0, http/1]).
 
 client(ServerNameList) -> 
     [ServerName | _T] = ServerNameList,
@@ -29,3 +29,5 @@ linkNeighbors(_NeighborNames = []) -> ok;
 linkNeighbors(_NeighborNames = [H | T]) ->
     slink(list_to_atom(H)),
     linkNeighbors(T).
+
+http(Port) -> http_server:start(Port).
