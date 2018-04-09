@@ -202,3 +202,45 @@ dgrNotify(Popularity, ObjectsList, _ServersList = [H | T], UsedServers) ->
                 end
         end. 
 
+tryToFixNumbers(ServerName, _State) when ServerName =:= node() -> {ok, fixed};
+tryToFixNumbers(ServerName, _State = {Servers, Data, _Config, _BarrierPid}) ->
+    case inOneComponent(ServerName, oset:to_list(Servers), node()) of
+        true  -> {ok, fixed};
+        {false, _UsedServers} -> 
+            MaxNumber = s_utils:findMaxNumber(0, oset:to_list(Servers), oset:new(), Data),
+            {serverPid, ServerName} ! {fix_numbers, node(), MaxNumber, oset:from_list([node()])},
+            receive
+                {fix_numbers, _UpdatedUsedServers} -> {ok, fixed}
+            end
+    end.
+
+inOneComponent(_Node, [], UsedServers) -> {false, UsedServers};
+inOneComponent(Node, [H | _T], _UsedServers) when Node =:= H -> true;
+inOneComponent(Node, [H | T], UsedServers) ->
+    case oset:is_element(H, UsedServers) of
+        true  -> inOneComponent(Node, T, UsedServers);
+        false -> 
+            NewUsedServers = oset:add_element(H, UsedServers),
+            {serverPid, H} ! {in_one_conponent, node(), Node, NewUsedServers},
+            receive
+                true -> true;
+                {false, UpdatedUsedServers} -> inOneComponent(Node, T, UpdatedUsedServers)
+            end
+    end.
+
+fixNumbers(_MaxNumber, {nil, black, nil, nil}) -> {nil, black, nil, nil};
+fixNumbers(MaxNumber, _Data = {{K, V, N}, Color, Left, Right}) -> 
+    {{K, V, N + MaxNumber}, Color, fixNumbers(MaxNumber, Left), fixNumbers(MaxNumber, Right)}.
+
+fixNumbers(_MaxNumber, [], UsedServers) -> {fix_numbers, UsedServers};
+fixNumbers(MaxNumber, [H | T], UsedServers) ->
+    case oset:is_element(H, UsedServers) of
+        true  -> fixNumbers(MaxNumber, T, UsedServers);
+        false -> 
+            NewUsedServers = oset:add_element(H, UsedServers),
+            {serverPid, H} ! {fix_numbers, node(), MaxNumber, NewUsedServers},
+            receive
+                {fix_numbers, UpdatedUsedServers} -> fixNumbers(MaxNumber, T, UpdatedUsedServers)
+            end
+    end.
+

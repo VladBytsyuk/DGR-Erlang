@@ -32,8 +32,7 @@ stop() -> serverPid ! stop.
 
 slink(ServerName) ->
     net_kernel:connect_node(ServerName),
-    {serverPid, ServerName} ! {link, node()},
-    serverPid ! {link, ServerName}.
+    serverPid ! {link_first, ServerName}.
 
 
 % Main loop
@@ -156,7 +155,24 @@ handleMessage({d_dgr, Pid, Popularity, ObjectsList, UsedServers}, State = {Serve
     Pid ! {d_dgr, UpdatedUsedServers},
     loop(dgr:dgr(State, Popularity, ObjectsList, no_initiator));
 
+handleMessage({in_one_conponent, Pid, Node, UsedServers}, State = {Servers, _Data, _Config, _BarrierPid}) ->
+    Pid ! s_utils:inOneComponent(Node, oset:to_list(Servers), UsedServers),
+    loop(State);
+
+handleMessage({fix_numbers, Pid, MaxNumber, UsedServers}, _State = {Servers, Data, Config, BarrierPid}) ->
+    NewData = s_utils:fixNumbers(MaxNumber, Data),
+    Message = s_utils:fixNumbers(MaxNumber, oset:to_list(Servers), UsedServers),
+    {serverPid, Pid} ! Message,
+    loop({Servers, NewData, Config, BarrierPid});
+
 % Link servers with each other
-handleMessage({link, ServerName}, _State = {ServersList, DataList, Config, BarrierPid}) ->
-    NewServersList = oset:add_element(ServerName, ServersList),
-    loop({NewServersList, DataList, Config, BarrierPid}).
+handleMessage({link_first, ServerName}, State = {Servers, Data, Config, BarrierPid}) ->
+    {ok, fixed} = s_utils:tryToFixNumbers(ServerName, State),
+    NewServers = oset:add_element(ServerName, Servers),
+    {serverPid, ServerName} ! {link_second, node()},   
+    loop({NewServers, Data, Config, BarrierPid});
+
+
+handleMessage({link_second, ServerName}, _State = {Servers, Data, Config, BarrierPid}) ->
+    NewServers = oset:add_element(ServerName, Servers),
+    loop({NewServers, Data, Config, BarrierPid}).
