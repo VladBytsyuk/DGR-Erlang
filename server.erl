@@ -159,18 +159,25 @@ handleMessage({in_one_conponent, Pid, Node, UsedServers}, State = {Servers, _Dat
     Pid ! s_utils:inOneComponent(Node, oset:to_list(Servers), UsedServers),
     loop(State);
 
-handleMessage({fix_numbers, Pid, MaxNumber, UsedServers}, _State = {Servers, Data, Config, BarrierPid}) ->
+handleMessage({fix_numbers, Pid, MaxNumber, UsedServers}, _State = {Servers, Data, _Config = {I, C, E, Ri, Xi}, BarrierPid}) ->
     NewData = s_utils:fixNumbers(MaxNumber, Data),
-    Message = s_utils:fixNumbers(MaxNumber, oset:to_list(Servers), UsedServers),
-    {serverPid, Pid} ! Message,
-    loop({Servers, NewData, Config, BarrierPid});
+    NewConfig = { I, C, E, s_utils:fillList(MaxNumber, 0) ++ Ri, s_utils:fillList(MaxNumber, 0) ++ Xi},
+    {fix_numbers, UpdatedUsedServers} = s_utils:fixNumbers(MaxNumber, oset:to_list(Servers), UsedServers),
+    {serverPid, Pid} ! {fix_numbers, UpdatedUsedServers},
+    loop({Servers, NewData, NewConfig, BarrierPid});
+
+handleMessage({max_number, Pid}, State = {Servers, Data, _Config, _BarrierPid}) ->
+    MaxNumber = s_utils:findMaxNumber(0, oset:to_list(Servers), oset:new(), Data),
+    {serverPid, Pid} ! MaxNumber,
+    loop(State);
 
 % Link servers with each other
-handleMessage({link_first, ServerName}, State = {Servers, Data, Config, BarrierPid}) ->
-    {ok, fixed} = s_utils:tryToFixNumbers(ServerName, State),
+handleMessage({link_first, ServerName}, State = {Servers, Data, _Config = {I, C, E, Ri, Xi}, BarrierPid}) ->
+    OtherComponentMaxNumber = s_utils:tryToFixNumbers(ServerName, State),
     NewServers = oset:add_element(ServerName, Servers),
+    NewConfig = {I, C, E, Ri ++ s_utils:fillList(OtherComponentMaxNumber, 0), Xi ++ s_utils:fillList(OtherComponentMaxNumber, 0)},
     {serverPid, ServerName} ! {link_second, node()},   
-    loop({NewServers, Data, Config, BarrierPid});
+    loop({NewServers, Data, NewConfig, BarrierPid});
 
 
 handleMessage({link_second, ServerName}, _State = {Servers, Data, Config, BarrierPid}) ->

@@ -202,15 +202,16 @@ dgrNotify(Popularity, ObjectsList, _ServersList = [H | T], UsedServers) ->
                 end
         end. 
 
-tryToFixNumbers(ServerName, _State) when ServerName =:= node() -> {ok, fixed};
+tryToFixNumbers(ServerName, _State) when ServerName =:= node() -> 0;
 tryToFixNumbers(ServerName, _State = {Servers, Data, _Config, _BarrierPid}) ->
     case inOneComponent(ServerName, oset:to_list(Servers), node()) of
-        true  -> {ok, fixed};
+        true -> 0;
         {false, _UsedServers} -> 
-            MaxNumber = s_utils:findMaxNumber(0, oset:to_list(Servers), oset:new(), Data),
+            MaxNumber = findMaxNumber(0, oset:to_list(Servers), oset:new(), Data),
+            OtherComponentMaxNumber = findMaxNumberOnOtherComponent(ServerName),
             {serverPid, ServerName} ! {fix_numbers, node(), MaxNumber, oset:from_list([node()])},
             receive
-                {fix_numbers, _UpdatedUsedServers} -> {ok, fixed}
+                {fix_numbers, _UpdatedUsedServers} -> OtherComponentMaxNumber
             end
     end.
 
@@ -244,3 +245,8 @@ fixNumbers(MaxNumber, [H | T], UsedServers) ->
             end
     end.
 
+findMaxNumberOnOtherComponent(ServerName) ->
+    {serverPid, ServerName} ! {max_number, node()},
+    receive
+        MaxNumber -> MaxNumber
+    end.
