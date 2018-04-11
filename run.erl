@@ -11,7 +11,8 @@ client(ServerNameList) ->
 
 server(Args) -> 
     [NumberString, CapacityString, BarrierNode | NeighborNames] = Args,
-    {Number, _} = string:to_integer(NumberString),
+    %{Number, _} = string:to_integer(NumberString),
+    Number = list_to_atom(NumberString),
     {Capacity, _} = string:to_integer(CapacityString),
     start(Number, Capacity, {barrier, list_to_atom(BarrierNode)}),
     case NeighborNames == ["empty"] of
