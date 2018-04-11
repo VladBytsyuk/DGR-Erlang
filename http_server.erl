@@ -7,7 +7,7 @@
 
 handle_request("PUT", "/create", Body) ->
     [NumberString, CapacityString, BarrierNameString] = string:tokens(Body, ?SEP),
-    {Number, _} = string:to_integer(NumberString),
+    Number = list_to_atom(NumberString),
     {Capacity, _} = string:to_integer(CapacityString),
     BarrierName = list_to_atom(BarrierNameString),
     server:start(Number, Capacity, {barrier, BarrierName}),
