@@ -43,15 +43,13 @@ loop(State) ->
     end.
 
 printState(State) ->
-    {Servers, Data, _Config = {I, C, E, Ri, Xi}, BarrierPid} = State,
+    {Servers, Data, _Config = {I, _C, _E, Ri, Xi}, BarrierPid} = State,
     io:format("~n", []),
-    io:format("~p State:~n", [node()]),
+    io:format("~p state:~n", [node()]),
     io:format(" Servers: ~p~n", [oset:to_list(Servers)]),
     io:format(" Data: ~p~n", [oset:to_list(Data)]),
     io:format(" Config:~n", []),
-    io:format("     Server number: ~p~n", [I]),
-    io:format("     Server capacity: ~p~n", [C]),
-    io:format("     Server space left: ~p~n", [E]),
+    io:format("     Server id: ~p~n", [I]),
     io:format("     Ri: ~p~n", [Ri]),
     io:format("     Xi: ~p~n", [Xi]),
     io:format(" Barrier: ~p~n", [BarrierPid]),
