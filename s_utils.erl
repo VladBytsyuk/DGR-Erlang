@@ -4,8 +4,8 @@
 
 -define(IF(Condition, True, False), (case (Condition) of true -> (True); false -> (False) end)).
 -define(MAX(A, B), (case (A > B) of true -> A; false -> B end)).
--define(TS, 9).
--define(TR, 5).
+-define(TS, 250).
+-define(TR, 40).
 -define(TL, 2).
 
 % Notify all neighbor-servers that current server was stopped
