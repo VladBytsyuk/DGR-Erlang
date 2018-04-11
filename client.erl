@@ -10,16 +10,21 @@ stop() ->
 
 
 set(Key, Value) -> 
-    clientPid ! {self_set, Key, Value},
-    {ok, send_request_to_server}.
+    clientPid ! {self_set, self(), Key, Value},
+    receive
+        Message -> Message    
+    end.
 
 get(Key) -> 
-    clientPid ! {self_get, Key},
-    {ok, wait_server_response}.
+    clientPid ! {self_get, self(), Key},
+    receive
+        {get, Object} -> Object;
+        Other -> Other
+    end.
 
 dgr() -> 
     clientPid ! dgr,
-    {dgr, run}.
+    {dgr, runned}.
 
 
 
@@ -34,23 +39,20 @@ loop(ServerName) ->
 
 
 
-handleMessage(self_stop, _ServerName) ->
-    {ok, client_stopped};
+handleMessage(self_stop, _ServerName) -> {ok, client_stopped};
 
-handleMessage({self_set, Key, Value}, ServerName) ->
-    {serverPid, ServerName} ! {c_set, self(), Key, Value};
+handleMessage({self_set, Pid, Key, Value}, ServerName) ->
+    {serverPid, ServerName} ! {c_set, self(), Key, Value},
+    receive
+        {c_set, {Key, Value, _Number}} -> Pid ! {ok, set};
+        _Other -> Pid ! {error, server}
+    end;
 
-handleMessage({self_get, Key}, ServerName) ->
-    {serverPid, ServerName} ! {c_get, self(), Key};
+handleMessage({self_get, Pid, Key}, ServerName) ->
+    {serverPid, ServerName} ! {c_get, self(), Key},
+    receive
+        {c_get, {Key, Value, _Number}} -> Pid ! {get, {Key, Value}};
+        _Other -> Pid ! {error, server}
+    end;
 
-handleMessage(dgr, ServerName) ->
-    {serverPid, ServerName} ! d_dgr;
-
-handleMessage({c_set, Object}, _ServerName) ->
-    io:format("Set: ~p~n", [Object]),
-    {ok, set, Object};
-
-handleMessage({c_get, Object}, _ServerName) ->
-    io:format("Get: ~p~n", [Object]),
-    {ok, get, Object}.
-        
+handleMessage(dgr, ServerName) -> {serverPid, ServerName} ! d_dgr.
