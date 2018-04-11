@@ -155,14 +155,22 @@ handleMessage({d_dgr, Pid, Popularity, ObjectsList, UsedServers}, State = {Serve
     Pid ! {d_dgr, UpdatedUsedServers},
     loop(dgr:dgr(State, Popularity, ObjectsList, no_initiator));
 
-handleMessage({in_one_conponent, Pid, Node, UsedServers}, State = {Servers, _Data, _Config, _BarrierPid}) ->
-    Pid ! s_utils:inOneComponent(Node, oset:to_list(Servers), UsedServers),
+handleMessage({in_one_component, Pid, Node, UsedServers}, State = {Servers, _Data, _Config, _BarrierPid}) ->
+    io:format("Is servers ~p and ~p in one component?~n", [node(), Node]),
+    InOneComponent = s_utils:inOneComponent(Node, oset:to_list(Servers), UsedServers),
+    io:format("~p~n", [InOneComponent]),
+    {serverPid, Pid} ! InOneComponent,
     loop(State);
 
 handleMessage({fix_numbers, Pid, MaxNumber, UsedServers}, _State = {Servers, Data, _Config = {I, C, E, Ri, Xi}, BarrierPid}) ->
+    io:format("Trying to increase object numbers on ~p [Already fixed on ~p]~n", [MaxNumber, oset:to_list(UsedServers)]),
     NewData = s_utils:fixNumbers(MaxNumber, Data),
-    NewConfig = { I, C, E, s_utils:fillList(MaxNumber, 0) ++ Ri, s_utils:fillList(MaxNumber, 0) ++ Xi},
+    io:format("NewData = ~p~n", [oset:to_list(NewData)]),
+
+    NewConfig = { I, C, E, s_utils:fillList(MaxNumber, 0) ++ Ri, s_utils:fillList(MaxNumber, 0) ++ Xi}, 
+    io:format("Trying to fix on numbers on neighbours...~n"),
     {fix_numbers, UpdatedUsedServers} = s_utils:fixNumbers(MaxNumber, oset:to_list(Servers), UsedServers),
+    io:format("Fixed! Response to ~p~n", [Pid]),
     {serverPid, Pid} ! {fix_numbers, UpdatedUsedServers},
     loop({Servers, NewData, NewConfig, BarrierPid});
 
@@ -171,11 +179,18 @@ handleMessage({max_number, Pid}, State = {Servers, Data, _Config, _BarrierPid}) 
     {serverPid, Pid} ! MaxNumber,
     loop(State);
 
+handleMessage({increase_ri_xi, Pid, Number, UsedServers}, _State = {Servers, Data, _Config = {I, C, E, Ri, Xi}, BarrierPid}) ->
+    NewConfig = {I, C, E, Ri ++ s_utils:fillList(Number, 0), Xi ++ s_utils:fillList(Number, 0)},
+    NewUsedServers = s_utils:increaseRiXi(Number, oset:to_list(Servers), UsedServers),
+    {serverPid, Pid} ! {ok, NewUsedServers},
+    loop({Servers, Data, NewConfig, BarrierPid});
+
 % Link servers with each other
 handleMessage({link_first, ServerName}, State = {Servers, Data, _Config = {I, C, E, Ri, Xi}, BarrierPid}) ->
     OtherComponentMaxNumber = s_utils:tryToFixNumbers(ServerName, State),
     NewServers = oset:add_element(ServerName, Servers),
     NewConfig = {I, C, E, Ri ++ s_utils:fillList(OtherComponentMaxNumber, 0), Xi ++ s_utils:fillList(OtherComponentMaxNumber, 0)},
+    s_utils:increaseRiXi(OtherComponentMaxNumber, oset:to_list(Servers), oset:from_list([node()])),
     {serverPid, ServerName} ! {link_second, node()},   
     loop({NewServers, Data, NewConfig, BarrierPid});
 

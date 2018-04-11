@@ -4,7 +4,7 @@
 
 -define(IF(Condition, True, False), (case (Condition) of true -> (True); false -> (False) end)).
 -define(MAX(A, B), (case (A > B) of true -> A; false -> B end)).
--define(TS, 18).
+-define(TS, 9).
 -define(TR, 5).
 -define(TL, 2).
 
@@ -192,40 +192,50 @@ getAllObjects(_ServersList = [H | T], Data, UsedServers) ->
 dgrNotify(_Popularity, _ObjectsList, _ServersList = [], UsedServers) -> UsedServers;
 dgrNotify(Popularity, ObjectsList, _ServersList = [H | T], UsedServers) ->
     case oset:is_element(H, UsedServers) of
-            true  -> dgrNotify(Popularity, ObjectsList, T, UsedServers);
-            false -> 
-                NewUsedServers = oset:add_element(H, UsedServers),
-                {serverPid, H} ! {d_dgr, {serverPid, node()}, Popularity, ObjectsList, NewUsedServers},
-                receive
-                    {d_dgr, UpdatedUsedServers} ->
-                        dgrNotify(Popularity, ObjectsList, T, UpdatedUsedServers)
-                end
-        end. 
+        true  -> dgrNotify(Popularity, ObjectsList, T, UsedServers);
+        false -> 
+            NewUsedServers = oset:add_element(H, UsedServers),
+            {serverPid, H} ! {d_dgr, {serverPid, node()}, Popularity, ObjectsList, NewUsedServers},
+            receive
+                {d_dgr, UpdatedUsedServers} ->
+                    dgrNotify(Popularity, ObjectsList, T, UpdatedUsedServers)
+            end
+    end. 
+
+
+
+
+
 
 tryToFixNumbers(ServerName, _State) when ServerName =:= node() -> 0;
 tryToFixNumbers(ServerName, _State = {Servers, Data, _Config, _BarrierPid}) ->
-    case inOneComponent(ServerName, oset:to_list(Servers), node()) of
-        true -> 0;
+    io:format("Is servers ~p and ~p in one component?~n", [node(), ServerName]),
+    case inOneComponent(ServerName, oset:to_list(Servers), oset:from_list([node()])) of
+        true -> io:format("In one component => 0~n"),0;
         {false, _UsedServers} -> 
+            io:format("In different components. Trying to find MaxNumber on my component...~n"),
             MaxNumber = findMaxNumber(0, oset:to_list(Servers), oset:new(), Data),
+            io:format("Max Number of my component = ~p. Trying to find MaxNumber of neighbour component...~n", [MaxNumber]),
             OtherComponentMaxNumber = findMaxNumberOnOtherComponent(ServerName),
-            {serverPid, ServerName} ! {fix_numbers, node(), MaxNumber, oset:from_list([node()])},
+            io:format("Max Number of neighbour component = ~p. Trying to fix numbers of neighbour component...~n", [OtherComponentMaxNumber]),
+            {serverPid, ServerName} ! {fix_numbers, node(), MaxNumber, oset:from_list([node(), ServerName])},
             receive
-                {fix_numbers, _UpdatedUsedServers} -> OtherComponentMaxNumber
+                {fix_numbers, _UpdatedUsedServers} -> io:format("Number in neighbours component are fixed => ~p~n", [OtherComponentMaxNumber]),OtherComponentMaxNumber
             end
     end.
 
-inOneComponent(_Node, [], UsedServers) -> {false, UsedServers};
+inOneComponent(_Node, [], UsedServers) -> io:format("Servers are in different components.~n"),{false, UsedServers};
 inOneComponent(Node, [H | _T], _UsedServers) when Node =:= H -> true;
 inOneComponent(Node, [H | T], UsedServers) ->
     case oset:is_element(H, UsedServers) of
         true  -> inOneComponent(Node, T, UsedServers);
         false -> 
             NewUsedServers = oset:add_element(H, UsedServers),
-            {serverPid, H} ! {in_one_conponent, node(), Node, NewUsedServers},
+            io:format(" Ask on ~p: ", [H]),
+            {serverPid, H} ! {in_one_component, node(), Node, NewUsedServers},
             receive
-                true -> true;
-                {false, UpdatedUsedServers} -> inOneComponent(Node, T, UpdatedUsedServers)
+                true -> io:format("True~n"),true;
+                {false, UpdatedUsedServers} -> io:format("False~n"),inOneComponent(Node, T, UpdatedUsedServers)
             end
     end.
 
@@ -237,11 +247,13 @@ fixNumbers(_MaxNumber, [], UsedServers) -> {fix_numbers, UsedServers};
 fixNumbers(MaxNumber, [H | T], UsedServers) ->
     case oset:is_element(H, UsedServers) of
         true  -> fixNumbers(MaxNumber, T, UsedServers);
-        false -> 
+        false ->
+            io:format(" Fix numbers on ~p~n", [H]),
             NewUsedServers = oset:add_element(H, UsedServers),
+            io:format(" Try to fix~n"),
             {serverPid, H} ! {fix_numbers, node(), MaxNumber, NewUsedServers},
             receive
-                {fix_numbers, UpdatedUsedServers} -> fixNumbers(MaxNumber, T, UpdatedUsedServers)
+                {fix_numbers, UpdatedUsedServers} -> io:format("Fixed on ~p~n", [H]),fixNumbers(MaxNumber, T, UpdatedUsedServers)
             end
     end.
 
@@ -250,3 +262,15 @@ findMaxNumberOnOtherComponent(ServerName) ->
     receive
         MaxNumber -> MaxNumber
     end.
+
+increaseRiXi(_Number, _ServersList = [], UsedServers) -> UsedServers;
+increaseRiXi(Number, _ServersList = [H | T], UsedServers) ->
+    case oset:is_element(H, UsedServers) of
+        true  -> increaseRiXi(Number, T, UsedServers);
+        false ->
+            NewUsedServers = oset:add_element(H, UsedServers),
+            {serverPid, H} ! {increase_ri_xi, node(), Number, NewUsedServers},
+            receive
+                {ok, UpdatedUsedServers} -> increaseRiXi(Number, T, UpdatedUsedServers)
+            end
+end.
