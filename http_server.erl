@@ -4,8 +4,11 @@
 -define(SEP, " ").
 -define(CRLF, "\r\n").
 
+handle_request("PUT", "/barrier", _Body) ->
+    dgr:start_barrier(),
+    {ok, barrier};
 
-handle_request("PUT", "/create", Body) ->
+handle_request("PUT", "/start", Body) ->
     [NumberString, CapacityString, BarrierNameString] = string:tokens(Body, ?SEP),
     Number = list_to_atom(NumberString),
     {Capacity, _} = string:to_integer(CapacityString),
@@ -14,10 +17,11 @@ handle_request("PUT", "/create", Body) ->
     {ok, create};
 
 handle_request("PUT", "/link", Body) ->
-    server:slink(list_to_atom(Body)),
+    _Response = server:slink(list_to_atom(Body)),
     {ok, link};
 
-handle_request("PUT", "/unlink", _Body) ->
+handle_request("PUT", "/unlink", Body) ->
+    _Response = server:sunlink(list_to_atom(Body)),
     {ok, unlink};
 
 handle_request("PUT", "/stop", _Body) ->
