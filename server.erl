@@ -1,5 +1,5 @@
 -module(server).
--export([start/3, stop/0, slink/1]).
+-export([start/3, stop/0, slink/1, sunlink/1]).
 
 % Macro
 -define(IF(Condition, True, False), (case (Condition) of true -> (True); false -> (False) end)).
@@ -32,8 +32,12 @@ stop() -> serverPid ! stop.
 
 slink(ServerName) ->
     net_kernel:connect_node(ServerName),
-    serverPid ! {link_first, ServerName}.
+    serverPid ! {link, self(), ServerName},
+    s_utils:forceMessage().
 
+sunlink(ServerName) ->
+    serverPid ! {unlink, self(), ServerName},
+    s_utils:forceMessage().
 
 % Main loop
 loop(State) -> 
@@ -183,16 +187,44 @@ handleMessage({increase_ri_xi, Pid, Number, UsedServers}, _State = {Servers, Dat
     {serverPid, Pid} ! {ok, NewUsedServers},
     loop({Servers, Data, NewConfig, BarrierPid});
 
+handleMessage({is_bridge, Pid, ServerB, UsedServers}, State = {Servers, _Data, _Config, _BarrierPid}) ->
+        IsBridge = s_utils:linkIsNotBridge(ServerB, oset:to_list(Servers), UsedServers),
+        {serverPid, Pid} ! IsBridge,
+        loop(State);
+
 % Link servers with each other
-handleMessage({link_first, ServerName}, State = {Servers, Data, _Config = {I, C, E, Ri, Xi}, BarrierPid}) ->
+handleMessage({link, Pid, ServerName}, State = {Servers, Data, _Config = {I, C, E, Ri, Xi}, BarrierPid}) ->
     OtherComponentMaxNumber = s_utils:tryToFixNumbers(ServerName, State),
     NewServers = oset:add_element(ServerName, Servers),
     NewConfig = {I, C, E, Ri ++ s_utils:fillList(OtherComponentMaxNumber, 0), Xi ++ s_utils:fillList(OtherComponentMaxNumber, 0)},
     s_utils:increaseRiXi(OtherComponentMaxNumber, oset:to_list(Servers), oset:from_list([node()])),
-    {serverPid, ServerName} ! {link_second, node()},   
+    {serverPid, ServerName} ! {link, node()},   
+    Pid ! {ok, linked},
     loop({NewServers, Data, NewConfig, BarrierPid});
 
 
-handleMessage({link_second, ServerName}, _State = {Servers, Data, Config, BarrierPid}) ->
+handleMessage({link, ServerName}, _State = {Servers, Data, Config, BarrierPid}) ->
     NewServers = oset:add_element(ServerName, Servers),
-    loop({NewServers, Data, Config, BarrierPid}).
+    loop({NewServers, Data, Config, BarrierPid});
+    
+handleMessage({unlink, ServerName}, _State = {Servers, Data, Config, BarrierPid}) ->
+    loop({oset:del_element(ServerName, Servers), Data, Config, BarrierPid});
+
+handleMessage({unlink, Pid, ServerName}, State = {Servers, Data, Config, BarrierPid}) ->
+    case oset:is_element(ServerName, Servers) of
+        false -> 
+            Pid ! {error, servers_are_not_linked},
+            loop(State);
+        true  ->
+            ServerList = oset:to_list(oset:del_element(ServerName, Servers)),
+            UsedServers = oset:from_list([node()]),
+            case s_utils:linkIsNotBridge(ServerName, ServerList, UsedServers) of
+                {false, _UpdatedUsedServers} -> 
+                    Pid ! {error, this_link_is_bridge_between_components},
+                    loop(State);
+                true ->
+                    Pid ! {ok, unlinked},
+                    {serverPid, ServerName} ! {unlink, node()},
+                    loop({oset:del_element(ServerName, Servers), Data, Config, BarrierPid})
+            end
+    end.

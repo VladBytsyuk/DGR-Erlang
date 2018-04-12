@@ -11,9 +11,7 @@ stop() ->
 
 set(Key, Value) -> 
     clientPid ! {self_set, self(), Key, Value},
-    receive
-        Message -> Message    
-    end.
+    s_utils:forceMessage().
 
 get(Key) -> 
     clientPid ! {self_get, self(), Key},

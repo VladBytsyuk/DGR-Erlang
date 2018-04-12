@@ -273,4 +273,25 @@ increaseRiXi(Number, _ServersList = [H | T], UsedServers) ->
             receive
                 {ok, UpdatedUsedServers} -> increaseRiXi(Number, T, UpdatedUsedServers)
             end
-end.
+    end.
+
+forceMessage() ->
+    receive
+        Message -> Message
+    end.
+
+linkIsNotBridge(_ServerB, _ServerList = [], UsedServers) -> {false, UsedServers};
+linkIsNotBridge(ServerB, _ServerList = [H | _T], _UsedServers) when H == ServerB -> true;
+linkIsNotBridge(ServerB, _ServerList = [H | T], UsedServers) ->
+    case oset:is_element(H, UsedServers) of
+        true  -> linkIsNotBridge(ServerB, T, UsedServers);
+        false ->
+            NewUsedServers = oset:add_element(H, UsedServers),
+            {serverPid, H} ! {is_bridge, node(), ServerB, NewUsedServers},
+            receive
+                true -> true;
+                {false, UpdatedUsedServers} -> linkIsNotBridge(ServerB, T, UpdatedUsedServers)
+            end
+    end.
+
+
