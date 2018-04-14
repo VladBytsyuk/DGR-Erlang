@@ -280,18 +280,45 @@ forceMessage() ->
         Message -> Message
     end.
 
+% Is ServerB in another component from node() with neighbors ServersList
 linkIsNotBridge(_ServerB, _ServerList = [], UsedServers) -> {false, UsedServers};
 linkIsNotBridge(ServerB, _ServerList = [H | _T], _UsedServers) when H == ServerB -> true;
 linkIsNotBridge(ServerB, _ServerList = [H | T], UsedServers) ->
+    %io:format(" UsedServers = ~p~n", [oset:to_list(UsedServers)]),
+    %io:format(" ServersList = ~p~n", [_ServerList]),
     case oset:is_element(H, UsedServers) of
         true  -> linkIsNotBridge(ServerB, T, UsedServers);
         false ->
             NewUsedServers = oset:add_element(H, UsedServers),
+            %io:format(" Is ~p-~p bridge? ", [node(), ServerB]),
             {serverPid, H} ! {is_bridge, node(), ServerB, NewUsedServers},
             receive
-                true -> true;
-                {false, UpdatedUsedServers} -> linkIsNotBridge(ServerB, T, UpdatedUsedServers)
+                true -> 
+                    %io:format("True~n"),
+                    true;
+                {false, UpdatedUsedServers} -> 
+                    %io:format("False~n"),
+                    linkIsNotBridge(ServerB, T, UpdatedUsedServers)
             end
     end.
 
+isBridgeNode(Node, ServersList) -> 
+    io:format("Is ~p bridge-node? (Neighbors: ~p)~n", [Node, ServersList]),
+    UsedServers = oset:from_list([Node]),
+    isBridgeNode(Node, ServersList, ServersList, UsedServers).
 
+isBridgeNode(_Node, [], _ServerList, UsedServers) -> {false, UsedServers}; 
+isBridgeNode(Node, [H | T], ServerList, UsedServers) ->
+    case oset:is_element(H, UsedServers) of
+        true  -> 
+            io:format(" Link ~p-~p is already checked~n", [node(), H]),
+            isBridgeNode(Node, T, ServerList, UsedServers);
+        false ->
+            ServerListWithoutH = oset:to_list(oset:del_element(H, oset:from_list(ServerList))),
+            NewUsedServers = oset:add_element(H, UsedServers),
+            io:format("Check ~p~n", [H]),
+            case linkIsNotBridge(H, ServerListWithoutH, oset:from_list([Node])) of
+                true -> isBridgeNode(Node, T, ServerList, NewUsedServers);
+                {false, _UpdatedUsedServers} -> true 
+            end
+    end.

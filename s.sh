@@ -7,7 +7,7 @@ gnome-terminal -e "erl -sname 'bob@vbytsyuk-xps15' -run run server 'b' 4 'barrie
 gnome-terminal -e "erl -sname 'client_bob@vbytsyuk-xps15' -run run client 'bob@vbytsyuk-xps15'"
 
 
-gnome-terminal -e "erl -sname 'carol@vbytsyuk-xps15' -run run server 'c' 2 'barrier@vbytsyuk-xps15'"
+gnome-terminal -e "erl -sname 'carol@vbytsyuk-xps15' -run run server 'c' 2 'barrier@vbytsyuk-xps15' 'bob@vbytsyuk-xps15'"
 gnome-terminal -e "erl -sname 'client_carol@vbytsyuk-xps15' -run run client 'carol@vbytsyuk-xps15'"
 
 

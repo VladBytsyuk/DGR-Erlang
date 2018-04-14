@@ -28,7 +28,9 @@ start(Number, Capacity, BarrierPid) ->
         }) 
     end)).
 
-stop() -> serverPid ! stop.
+stop() -> 
+    serverPid ! {stop, self()},
+    s_utils:forceMessage().
 
 slink(ServerName) ->
     net_kernel:connect_node(ServerName),
@@ -66,9 +68,18 @@ printState(State) ->
 %% ================================================================================================
 
 % Current server was stopped
-handleMessage(stop, _State = {Servers, _Data, _Config, BarrierPid}) -> 
-    io:format("Stop~n",[]),
-    s_utils:notifyStop(oset:to_list(Servers), oset:new(), node(), BarrierPid);
+handleMessage({stop, Pid}, State = {Servers, Data, _Config, _BarrierPid}) -> 
+    case s_utils:isBridgeNode(node(), oset:to_list(Servers)) of
+        true  -> 
+            Pid ! {error, stopping_this_node_breaks_the_system_into_two_components},
+            loop(State);
+        {false, _UsedServers} -> 
+            io:format("Stop~n"),
+            [H | _T] = oset:to_list(Servers),
+            {serverPid, H} ! {add_all, Data},
+            s_utils:notifyStop(oset:to_list(Servers), oset:new(), node()),    
+            Pid ! {ok, stopped}
+    end;
 
 % Remote server was stopped
 handleMessage({s_stopped, Pid, StoppedName, UsedServers}, _State = {Servers, Data, Config, BarrierPid}) ->
@@ -188,9 +199,14 @@ handleMessage({increase_ri_xi, Pid, Number, UsedServers}, _State = {Servers, Dat
     loop({Servers, Data, NewConfig, BarrierPid});
 
 handleMessage({is_bridge, Pid, ServerB, UsedServers}, State = {Servers, _Data, _Config, _BarrierPid}) ->
+        io:format("Is ~p-~p brdge? ", [node(), ServerB]),
         IsBridge = s_utils:linkIsNotBridge(ServerB, oset:to_list(Servers), UsedServers),
+        io:format("Send reponse to ~p~n", [Pid]),
         {serverPid, Pid} ! IsBridge,
         loop(State);
+handleMessage({add_all, NewData}, _State = {Servers, Data, Config, BarrierPid}) ->
+    UpdatedData = oset:union(Data, NewData),
+    loop({Servers, UpdatedData, Config, BarrierPid});
 
 % Link servers with each other
 handleMessage({link, Pid, ServerName}, State = {Servers, Data, _Config = {I, C, E, Ri, Xi}, BarrierPid}) ->
