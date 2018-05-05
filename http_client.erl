@@ -11,7 +11,9 @@ request(Method, Adress, Port, Command, Body) ->
     AdressString = concat("http://", Adress),
     PortString = concat(":", concat(Port, "/")),
     Host = concat(AdressString, concat(PortString, Command)),
-    Response = httpc:request(Method, {Host, [], "text", Body},  [],  []),
+    HostWithBody = concat(Host, concat("?body=", Body)),
+    io:format("~p~n", [HostWithBody]),
+    Response = httpc:request(Method, {HostWithBody, [], "text", ""},  [],  []),
     parseResponse(Response).
 
-register(Adress, Port) -> request("PUT", Adress, Port, "register", node()).
+register(Adress, Port) -> request(put, Adress, Port, "register", atom_to_list(node())).

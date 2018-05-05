@@ -1,5 +1,5 @@
 -module(http_server).
--export([start/1]).
+-export([start/2]).
 
 -define(SEP, " ").
 -define(CRLF, "\r\n").
@@ -31,10 +31,11 @@ handle_request("PUT", "/stop", _Body) ->
 handle_request(_Method, _Command, _Body) -> {error, unexpected_request}.
 
 
-start(Port) ->
+start(Adress, Port) ->
     io:format("server started.~n"),
     {ok, ServerSocket} = gen_tcp:listen(Port, [binary, {packet, 0},
         {reuseaddr, true}, {active, true}]),
+    http_client:register(Adress, integer_to_list(Port)),
     server_loop(ServerSocket).
 
 server_loop(ServerSocket) ->
