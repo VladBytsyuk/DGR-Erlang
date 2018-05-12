@@ -1,6 +1,19 @@
 DGR-Erlang
+=======================
 
-names.txt
-File contains strings like:
-N NAME [NUMBERS...]
-where N - number of server, NAME - name of erlang node with server, NUMBERS... - numbers of linked servers with server NAME
+Версия Erlang 7.3
+
+Запуск Erlang Shell:
+----------------
+$ erl -name shell_name@ip -setcookie abc
+
+где shell_name - любое имя для оболочки, ip - ip адрес машины на которой запускается
+
+
+Запуск сервера
+----------------
+$ (shell_name@ip)1> http_server:start("ip", manager_port, shell_port).
+
+где ip - ip адрес машины менеджера (обязательно в кавчках), manager_port - порт менеджера (числом), shell_port - порт на котором запустится сервер ожидания команд от менеджера (числом).
+
+При запуске нескольких серверов на одной машине shell_port должны быть разными.
