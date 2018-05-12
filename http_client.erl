@@ -1,6 +1,6 @@
 -module(http_client).
 -compile(export_all).
--export([request/5, register/2]).
+-export([request/5, register/3]).
 
 -import(string, [concat/2]).
 
@@ -16,4 +16,11 @@ request(Method, Adress, Port, Command, Body) ->
     Response = httpc:request(Method, {HostWithBody, [], "text", ""},  [],  []),
     parseResponse(Response).
 
-register(Adress, Port) -> request(put, Adress, Port, "register", atom_to_list(node())).
+register(Adress, Port, MyPort) -> request(put, 
+        Adress, 
+        Port, 
+        "register", 
+        concat(
+            concat(atom_to_list(node()), ":"), MyPort
+        )
+    ).

@@ -3,7 +3,7 @@
 -import(server, [start/3, slink/1]).
 -import(client, [cstart/1, set/2]).
 
--export([server/1, client/1, cfill/2, measure/1, measure/2, getObjectNTimes/2, http/1]).
+-export([server/1, client/1, cfill/2, measure/1, measure/2, getObjectNTimes/2, http/1, reg/0]).
 
 client(Args) -> 
     [ServerName, LeftString, RightString | _T] = Args,
@@ -49,3 +49,5 @@ measure(N, Key) ->
     
 
 http(Port) -> http_server:start(Port).
+
+reg() -> http_server:start("192.168.0.10", 3000, 8001).
