@@ -148,7 +148,7 @@ handleMessage({d_data, Pid, UsedServers}, State = {Servers, Data, _Config, _Barr
     Pid ! {d_data, Objects, NewUsedServers},
     loop(State);
 
-handleMessage(d_dgr, State = {Servers, Data, _Config = {_I, _C, _E, Ri, _Xi}, BarrierPid}) ->
+handleMessage({d_dgr, Pid}, State = {Servers, Data, _Config = {_I, _C, _E, Ri, _Xi}, BarrierPid}) ->
     BarrierPid ! start,
     
     UsedServers = oset:add_element(node(), oset:new()),
@@ -161,7 +161,9 @@ handleMessage(d_dgr, State = {Servers, Data, _Config = {_I, _C, _E, Ri, _Xi}, Ba
     io:format(" Objects: ~p~n", [ObjectsList]),
 
     s_utils:dgrNotify(Popularity, ObjectsList, oset:to_list(Servers), UsedServers),
-    loop(dgr:dgr(State, Popularity, ObjectsList, initiator));
+    NewState = dgr:dgr(State, Popularity, ObjectsList, initiator),
+    Pid ! {ok, dgr},
+    loop(NewState);
 
 handleMessage({d_dgr, Pid, Popularity, ObjectsList, UsedServers}, State = {Servers, _Data, _Config, _BarrierPid}) ->
     UpdatedUsedServers = s_utils:dgrNotify(Popularity, ObjectsList, oset:to_list(Servers), oset:add_element(node(), UsedServers)),

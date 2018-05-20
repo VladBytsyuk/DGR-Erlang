@@ -21,8 +21,8 @@ get(Key) ->
     end.
 
 dgr() -> 
-    clientPid ! dgr,
-    {dgr, runned}.
+    clientPid ! {dgr, self()},
+    s_utils:forceMessage().
 
 
 
@@ -53,4 +53,4 @@ handleMessage({self_get, Pid, Key}, ServerName) ->
         _Other -> Pid ! {error, server}
     end;
 
-handleMessage(dgr, ServerName) -> {serverPid, ServerName} ! d_dgr.
+handleMessage({dgr, Pid}, ServerName) -> {serverPid, ServerName} ! {d_dgr, Pid}.
