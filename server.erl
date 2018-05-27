@@ -161,14 +161,15 @@ handleMessage({d_dgr, Pid}, State = {Servers, Data, _Config = {_I, _C, _E, Ri, _
     io:format(" Objects: ~p~n", [ObjectsList]),
 
     s_utils:dgrNotify(Popularity, ObjectsList, oset:to_list(Servers), UsedServers),
-    NewState = dgr:dgr(State, Popularity, ObjectsList, initiator),
-    Pid ! {ok, dgr},
+    {NewState, Iterations} = dgr:dgr(State, Popularity, ObjectsList, initiator),
+    Pid ! {ok, dgr, Iterations},
     loop(NewState);
 
 handleMessage({d_dgr, Pid, Popularity, ObjectsList, UsedServers}, State = {Servers, _Data, _Config, _BarrierPid}) ->
     UpdatedUsedServers = s_utils:dgrNotify(Popularity, ObjectsList, oset:to_list(Servers), oset:add_element(node(), UsedServers)),
     Pid ! {d_dgr, UpdatedUsedServers},
-    loop(dgr:dgr(State, Popularity, ObjectsList, no_initiator));
+    {NewState, _Iterations} = dgr:dgr(State, Popularity, ObjectsList, no_initiator),
+    loop(NewState);
 
 handleMessage({in_one_component, Pid, Node, UsedServers}, State = {Servers, _Data, _Config, _BarrierPid}) ->
     io:format("Is servers ~p and ~p in one component?~n", [node(), Node]),

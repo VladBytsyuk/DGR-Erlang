@@ -63,5 +63,5 @@ requestImpl(_List = [H | T]) ->
 requestImpl(_List = []) -> {ok, request}.
 
 measureDgr() ->
-    {Time, {ok, dgr}} = timer:tc(client, dgr, []),
-    {seconds, Time / 1000000}.
+    {Time, {ok, dgr, Iterations}} = timer:tc(client, dgr, []),
+    {{time, Time / 1000000, seconds}, {iterations, Iterations}}.

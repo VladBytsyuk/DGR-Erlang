@@ -3,7 +3,7 @@
 
 -define(IF(Condition, True, False), (case (Condition) of true -> (True); false -> (False) end)).
 -define(MAX(A, B), (case (A > B) of true -> A; false -> B end)).
--define(BARRIER_TIME, 50).
+-define(BARRIER_TIME, 250).
 -define(TS, 250).
 -define(TR, 40).
 -define(TL, 2).
@@ -51,8 +51,8 @@ dgr(_State = {Servers, _Data, _Config = {I, C, _E, Ri, _Xi}, BarrierPid}, Popula
     {IgMax, J} = s_utils:findIgMax(Ig),
     SendMsg = {IgMax, I, J, 0},
     RecvMsg = allReduceMax(BarrierPid, SendMsg),
-    {NewData, NewConfig} = whileLoop(RecvMsg, BarrierPid, Objects, oset:new(), {I, C, NewE, Ri, NewXi}, {Popularity, MaxNumber, Ig, Ec, Rc}, Servers, Initiator),
-    {Servers, NewData, NewConfig, BarrierPid}.
+    {NewData, NewConfig, Iterations} = whileLoop(0, RecvMsg, BarrierPid, Objects, oset:new(), {I, C, NewE, Ri, NewXi}, {Popularity, MaxNumber, Ig, Ec, Rc}, Servers, Initiator),
+    {{Servers, NewData, NewConfig, BarrierPid}, Iterations}.
 
 getPopularity(List, _ServersList = [], UsedServers) -> {List, UsedServers};
 getPopularity(List, _ServersList = [H | T], UsedServers) ->
@@ -78,7 +78,8 @@ findMaxMessage(_MessageList = [H = {HIgMax, _HI, _HJ, _HJ_} | T], _Msg = {IgMax,
 findMaxMessage(_MessageList = [_H = {_HIgMax, _HI, _HJ, _HJ_} | T], Msg) -> findMaxMessage(T, Msg).
 
 
-whileLoop(RecvMsg = {IgMax, _I_, _J, _J_}, 
+whileLoop(Iterations,
+            RecvMsg = {IgMax, _I_, _J, _J_}, 
             BarrierPid, 
             Objects,
             Data,
@@ -93,8 +94,8 @@ whileLoop(RecvMsg = {IgMax, _I_, _J, _J_},
     SendMsg = {ResIgMax, I, NewJ, ResJ_},
     initiateBarrier(Initiator, BarrierPid),
     NewRecvMsg = allReduceMax(BarrierPid, SendMsg),
-    whileLoop(NewRecvMsg, BarrierPid, Objects, NewData, {I, C, ResE, Ri, ResXi}, {P, MaxNumber, ResIg, ResEc, ResRc}, Servers, Initiator);
-whileLoop(_RecvMsg, _BarrierPid, _Objects, Data, Config, _Buf, _Servers, _Initiator) -> {Data, Config}.
+    whileLoop(Iterations + 1, NewRecvMsg, BarrierPid, Objects, NewData, {I, C, ResE, Ri, ResXi}, {P, MaxNumber, ResIg, ResEc, ResRc}, Servers, Initiator);
+whileLoop(Iterations, _RecvMsg, _BarrierPid, _Objects, Data, Config, _Buf, _Servers, _Initiator) -> {Data, Config, Iterations}.
 
 igIf(_RecvMsg = {_IgMax, I_, J, J_}, 
         Objects,
@@ -109,7 +110,7 @@ igIf(_RecvMsg = {_IgMax, I_, J, J_},
     NewIg = s_utils:replaceListItem(J, 0, Ig),
     NewE = E - 1,
     NewRc = s_utils:replaceListItem(J, s_utils:getListItem(J, Rc) + 1, Rc),
-    evictedIfIgSelf(NewData, UpdatedXi, NewIg, NewEc, NewE, NewRc, J_);
+    evictedIfIgSelf(NewData, UpdatedXi, NewIg, NewEc, NewE, NewRc, J_, J);
 
 igIf(_RecvMsg = {_IgMax, _I_, J, J_}, 
         _Objects,
@@ -122,7 +123,7 @@ igIf(_RecvMsg = {_IgMax, _I_, J, J_},
     {ResultRc, ResultEc} = evictedIfIgOther(J_, NewXi, Ri, P, NewRc, NewEc),
     {Data, NewXi, NewIg, ResultEc, E, ResultRc}.
 
-evictedIfIgSelf(Data, Xi, Ig, Ec, E, Rc, J) when J =/= 0 ->
+evictedIfIgSelf(Data, Xi, Ig, Ec, E, Rc, J, CJ) when J =/= 0, J =/= CJ->
     NewXi = s_utils:replaceListItem(J, 0, Xi),
     NewData = s_utils:removeObjectByNumber(Data, J),
     NewIg = s_utils:replaceListItem(J, s_utils:getListItem(J, Ec), Ig),
@@ -130,7 +131,7 @@ evictedIfIgSelf(Data, Xi, Ig, Ec, E, Rc, J) when J =/= 0 ->
     NewE = E + 1,
     NewRc = s_utils:replaceListItem(J, s_utils:getListItem(J, Rc) - 1, Rc),
     {?IF(NewData =:= {error, no_object_with_current_number}, Data, NewData), NewXi, NewIg, NewEc, NewE, NewRc};
-evictedIfIgSelf(Data, Xi, Ig, Ec, E, Rc, _J) -> {Data, Xi, Ig, Ec, E, Rc}.
+evictedIfIgSelf(Data, Xi, Ig, Ec, E, Rc, _J, _CJ) -> {Data, Xi, Ig, Ec, E, Rc}.
 
 replicaIf(Xij, Rij, J, Ig, Ec) when Xij == 0 -> 
     NewIg = s_utils:replaceListItem(J, Rij * (?TR - ?TL), Ig),
